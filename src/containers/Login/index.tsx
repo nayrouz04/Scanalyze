@@ -1,79 +1,62 @@
 // ─────────────────────────────────────────────
-//  pages/Login/Login.tsx
-//  Page publique — accessible sans connexion
-//  CONNECTÉE AU REDUX STORE
-//  Concepts : Redux, useDispatch, useSelector,
-//             validation formulaire, saga
+//  containers/Login/index.tsx
+//  Page publique — avec React Hook Form + Redux
+//  Concepts : useForm, register, handleSubmit,
+//             formState.errors, useDispatch, useSelector
 // ─────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";  // ← Redux hooks
+import { useForm } from "react-hook-form";
+import { useDispatch, useSelector } from "react-redux";
 import { ROUTES } from "../../navigation/routes";
-import { loginRequest } from "../../store/auth/authSlice";  // ← action
+import { loginRequest } from "../../store/auth/authSlice";
 import {
   selectIsLoading,
   selectAuthError,
   selectToken,
-} from "../../store/auth/authSelectors";  // ← selectors
+} from "../../store/auth/authSelectors";
+
+// ── Type des données du formulaire ────────────
+interface LoginFormData {
+  email:      string;
+  password:   string;
+  rememberMe: boolean;
+}
 
 // ─────────────────────────────────────────────
 export default function Login() {
-  const navigate  = useNavigate();
-  const dispatch  = useDispatch();  // ← pour envoyer des actions à Redux
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  // ── State local (UI seulement) ───────────────
-  const [email, setEmail]               = useState<string>("");
-  const [password, setPassword]         = useState<string>("");
-  const [rememberMe, setRememberMe]     = useState<boolean>(false);
-  const [showPassword, setShowPassword] = useState<boolean>(false);
+  // ── React Hook Form ───────────────────────
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>();
 
-  // ── State Redux (vient du store global) ──────
-  const isLoading = useSelector(selectIsLoading);  // ← lit depuis Redux
-  const error     = useSelector(selectAuthError);  // ← lit depuis Redux
-  const token     = useSelector(selectToken);      // ← lit depuis Redux
+  // ── Redux state ───────────────────────────
+  const isLoading  = useSelector(selectIsLoading);
+  const reduxError = useSelector(selectAuthError);
+  const token      = useSelector(selectToken);
 
-  // ── Redirection automatique si login réussi ──
-  // Quand Redux met à jour le token → on redirige
+  // ── Redirection si connecté ───────────────
   useEffect(() => {
-    if (token) {
-      navigate(ROUTES.DASHBOARD);
-    }
+    if (token) navigate(ROUTES.DASHBOARD);
   }, [token, navigate]);
 
-  // ── Validation locale ────────────────────────
-  const [localError, setLocalError] = useState<string>("");
-
-  const validate = (): string => {
-    if (!email || !password) return "Veuillez remplir tous les champs.";
-    if (!email.includes("@")) return "Adresse email invalide.";
-    return "";
+  // ── Soumission → Redux/Saga ───────────────
+  const onSubmit = (data: LoginFormData) => {
+    dispatch(loginRequest({ email: data.email, password: data.password }));
   };
 
-  // ── Soumission → dispatch vers Redux/Saga ────
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLocalError("");
-
-    const validationError = validate();
-    if (validationError) {
-      setLocalError(validationError);
-      return;
-    }
-
-    // dispatch → authSlice → authSaga → API backend
-    dispatch(loginRequest({ email, password }));
-  };
-
-  // ── Erreur à afficher (locale ou Redux) ──────
-  const displayError = localError || error;
-
-  // ── Rendu ────────────────────────────────────
+  // ── Rendu ─────────────────────────────────
   return (
     <div style={styles.page}>
       <div style={styles.card}>
 
-        {/* ── Logo ── */}
+        {/* Logo */}
         <div style={styles.logoContainer}>
           <div style={styles.logoBox}>
             <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
@@ -88,88 +71,73 @@ export default function Login() {
           <p style={styles.subtitle}>Intelligent Document Processing</p>
         </div>
 
-        {/* ── Formulaire ── */}
-        <form onSubmit={handleSubmit} style={styles.form}>
+        {/* Formulaire */}
+        <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
 
           {/* Email */}
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="#6b7280">
-                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-              </svg>
-              Email or Username
-            </label>
+            <label style={styles.label}>Email or Username</label>
             <input
               type="text"
               placeholder="Enter your email or username"
-              value={email}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setEmail(e.target.value)
-              }
               style={styles.input}
+              {...register("email", {
+                required: "Veuillez remplir ce champ",
+                pattern: {
+                  value: /\S+@\S+\.\S+/,
+                  message: "Adresse email invalide",
+                },
+              })}
             />
+            {errors.email && (
+              <div style={styles.errorBox}>⚠️ {errors.email.message}</div>
+            )}
           </div>
 
           {/* Password */}
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="#6b7280">
-                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
-              </svg>
-              Password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setPassword(e.target.value)
-                }
-                style={{ ...styles.input, paddingRight: "44px" }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={styles.eyeBtn}
-              >
-                {showPassword ? "🙈" : "👁️"}
-              </button>
-            </div>
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              style={styles.input}
+              {...register("password", {
+                required: "Veuillez remplir ce champ",
+                minLength: {
+                  value: 6,
+                  message: "Minimum 6 caractères",
+                },
+              })}
+            />
+            {errors.password && (
+              <div style={styles.errorBox}>⚠️ {errors.password.message}</div>
+            )}
           </div>
 
-          {/* Remember me + Forgot password */}
-          <div style={styles.row}>
-            <label style={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setRememberMe(e.target.checked)
-                }
-                style={styles.checkbox}
-              />
-              Remember me
-            </label>
-            <a href="/forgot-password" style={styles.link}>
-              Forgot Password?
-            </a>
-          </div>
+          {/* Remember me */}
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              style={styles.checkbox}
+              {...register("rememberMe")}
+            />
+            Remember me
+          </label>
 
-          {/* Erreur */}
-          {displayError && (
-            <div style={styles.errorBox}>⚠️ {displayError}</div>
+          {/* Erreur Redux (backend) */}
+          {reduxError && (
+            <div style={styles.errorBox}>⚠️ {reduxError}</div>
           )}
 
           {/* Bouton LOGIN */}
           <button
             type="submit"
+            disabled={isLoading}
             style={{
               ...styles.loginBtn,
               opacity: isLoading ? 0.7 : 1,
-              cursor: isLoading ? "not-allowed" : "pointer",
+              cursor:  isLoading ? "not-allowed" : "pointer",
             }}
-            disabled={isLoading}
           >
             {isLoading ? "Connexion en cours..." : "LOGIN"}
           </button>
@@ -218,7 +186,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: "center",
     marginBottom: "32px",
   },
-  logoBox: { marginBottom: "12px" },
+  logoBox:  { marginBottom: "12px" },
   title: {
     fontSize: "28px",
     fontWeight: "700",
@@ -245,9 +213,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "14px",
     fontWeight: "600",
     color: "#374151",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
   },
   input: {
     width: "100%",
@@ -259,22 +224,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#111827",
     backgroundColor: "#fff",
     boxSizing: "border-box",
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: "12px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "16px",
-    padding: "4px",
-  },
-  row: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   checkboxLabel: {
     display: "flex",
@@ -289,12 +238,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     height: "16px",
     accentColor: "#1a3a8f",
     cursor: "pointer",
-  },
-  link: {
-    fontSize: "14px",
-    color: "#1a3a8f",
-    fontWeight: "600",
-    textDecoration: "none",
   },
   errorBox: {
     fontSize: "13px",

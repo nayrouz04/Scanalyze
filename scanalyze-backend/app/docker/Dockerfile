@@ -21,12 +21,22 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
+# Create pip config to optimize downloads
+RUN mkdir -p ~/.pip && cat > ~/.pip/pip.conf << 'EOF'
+[global]
+timeout = 1000
+retries = 5
+EOF
+
 # Copy requirements first — Docker layer cache:
 # if requirements.txt doesn't change, this layer is reused.
 COPY requirements.txt .
 
-RUN pip install --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --prefix=/install --no-cache-dir \
+      --default-timeout=1000 \
+      --retries 5 \
+      -r requirements.txt
 
 # Download spaCy model
 RUN python -m spacy download en_core_web_sm

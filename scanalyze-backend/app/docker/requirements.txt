@@ -36,8 +36,8 @@ opencv-python-headless==4.10.0.84
 numpy==1.26.4
 scipy==1.14.1
 easyocr==1.7.1
+paddlepaddle-cpu==2.6.2
 paddleocr==2.8.1
-paddlepaddle==2.6.2
 spacy==3.7.6
 langdetect==1.0.9
 ollama==0.3.3

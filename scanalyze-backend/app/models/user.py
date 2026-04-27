@@ -1,20 +1,23 @@
 """
 app/models/user.py – User ORM model
 """
+#C'est le fichier qui représente la table users dans la base de données
+from __future__ import annotations
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean,Date, DateTime,String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+#Mapped = dit le type Python, mapped_column = crée une colonne en BDD, relationship = lien entre tables
 
 from app.db.session import Base
 
 
-class UserRole(str, Enum):
+class UserRole(str):
     ADMIN = "admin"
     USER = "user"
-    VIEWER = "viewer"
+   #VIEWER = "viewer"
 
 
 class User(Base):
@@ -31,9 +34,13 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    full_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
 
+    office_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone_nbr: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

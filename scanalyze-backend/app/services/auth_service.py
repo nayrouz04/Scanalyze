@@ -1,12 +1,14 @@
 """
 app/services/auth_service.py – Auth business logic (no HTTP concerns here)
 """
-import logging
+#c'est le cerveau d'authentification, c'est lui qui contient toute la logique metier - ni http , ni BD directe
+
+import logging #Pour afficher des messages dans le terminal (ex: "New user registered")
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession # = session BD non bloquante
 
 from app.config import get_settings
 from app.core.security import (
@@ -15,15 +17,17 @@ from app.core.security import (
     hash_password,
     hash_token,
     verify_password,
-)
+) # on importe les fonctions de sécurité qu'on a vues dans "security.py"
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
+# on importe les modèles BD et le schéma du formulaire d'inscription
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Lock account after this many failed attempts
+#Apres 5 mauvais mots de passe → compte bloque 15 minutes
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 
@@ -51,20 +55,27 @@ class AuthService:
         if existing.scalar_one_or_none():
             raise AuthError("Email already registered", 409)
 
+        #generation automatique de username depuis full_name
+        base_username = data.full_name.lower().strip().replace(" ", "_")
         # Check username uniqueness
         existing_username = await self.db.execute(
-            select(User).where(User.username == data.username.lower())
+            select(User).where(User.username == base_username)
         )
         if existing_username.scalar_one_or_none():
-            raise AuthError("Username already taken", 409)
+            #ajoute un suffixe unique aleatoire
+            base_username = f"{base_username}_{uuid.uuid4().hex[:6]}"
 
+        #
         user = User(
             id=uuid.uuid4(),
             email=data.email.lower(),
-            username=data.username.lower(),
+            username=base_username,
             hashed_password=hash_password(data.password),
-            full_name=data.full_name,
-            role="user",
+            full_name=data.full_name.strip(),
+            role=data.role.value, #"admin" ou "user" depuis RoleEnum
+            office_address =data.office_address,
+            phone_nbr=data.phone_nbr,
+            birth_date=data.birth_date,
             is_active=True,
             is_verified=False,   # set True after email verification flow
         )

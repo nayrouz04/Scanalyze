@@ -13,16 +13,13 @@ class RoleEnum(str, Enum):
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    #username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
-    #uniquement lettres, chiffres, tiret, underscore — entre 3 et 50 caractères
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=3, max_length=150)
-    birth_date: date | None = Field(default= None) #optionnel , format date :annee-mois-jour
-    office_address: str = Field(min_length=1, max_length=255)
-    #@ du burreau obligatoire
+    birth_date: date | None = Field(default= None) #optional, date format: year-month-day
+    office_address: str = Field(min_length=1, max_length=255)#office address is required
     phone_nbr: str | None = Field(default=None, pattern=r"^\+?[0-9\s\-]{7,20}$")
-    #OPTIONNEL — accepte les formats : +216 12 345 678 / 0021612345678
-    #pattern = vérifie que c'est bien un numéro (chiffres, espaces, tiret, +)
+    # OPTIONAL — accepts formats: +216 12 345 678 / 0021612345678
+    # pattern = validates that it is a valid phone number (digits, spaces, dash, +)
     role : RoleEnum = Field(default=RoleEnum.USER)  
       
     @field_validator("password")
@@ -41,22 +38,16 @@ class RegisterRequest(BaseModel):
             raise ValueError(f"Password must contain: {', '.join(errors)}")
         return v
 
-    # @field_validator("username")
-    # @classmethod
-    # def username_lowercase(cls, v: str) -> str:
-    #     return v.lower()
-
     @field_validator("full_name")
     @classmethod
     def full_name_valid(cls, v:str) -> str:
         if not all(c.isalpha() or c.isspace() for c in v):
             raise ValueError("Full name must contain only letters and spaces")
-        return v.strip() #.strip() supprime les espaces au debut et à la fin
+        return v.strip() #.strip() removes leading and trailing spaces
 
 class RegisterResponse(BaseModel):
     id: uuid.UUID
     email: str
-    username: str #generer automatiquement
     full_name: str
     role: str
     is_active: bool
@@ -72,8 +63,8 @@ class RegisterResponse(BaseModel):
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
-    """Accepts email OR username + password."""
-    login: str = Field(description="Email address or username")
+    """Accepts email + password."""
+    login: str = Field(description="Email address")
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -88,7 +79,6 @@ class TokenResponse(BaseModel):
 class UserInfo(BaseModel):
     id: uuid.UUID
     email: str
-    username: str
     full_name: str | None
     role: str
 
@@ -140,4 +130,36 @@ class ChangePasswordRequest(BaseModel):
             errors.append("at least one special character")
         if errors:
             raise ValueError(f"Password must contain: {', '.join(errors)}")
+        return v
+    
+#___ pwd Reset ____________________
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str
+    
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v:str) -> str:
+        errors = []
+        if not any(c.isupper() for c in v):
+            errors.append("at least one uppercase letter")
+        if not any(c.islower() for c in v):
+            errors.append("at least one lowercase letter")
+        if not any(c.isdigit() for c in v):
+            errors.append("at least one digit")
+        if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v):
+            errors.append("at least one special character")
+        if errors:
+            raise ValueError(f"Password must contain: {', '.join(errors)}")
+        return v
+    
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, v: str, info) -> str:
+        if "new_password" in info.data and v != info.data["new_password"]:
+            raise ValueError("Passwords do not match")
         return v

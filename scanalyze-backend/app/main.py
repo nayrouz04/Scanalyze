@@ -11,8 +11,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.config import get_settings
 from app.core.middleware import RateLimitMiddleware, RequestLoggingMiddleware
 from app.core.exceptions import register_exception_handlers
-from app.api.v1 import auth
-#from app.api.v1 import documents, jobs, results
+from app.api.v1.router import main_router
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -51,10 +50,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     # ── Routers ───────────────────────────────
-    app.include_router(auth.router,      prefix="/api/v1/auth",      tags=["auth"])
-    #app.include_router(documents.router, prefix="/api/v1/documents",  tags=["documents"])
-    #app.include_router(jobs.router,      prefix="/api/v1/jobs",       tags=["jobs"])
-    #app.include_router(results.router,   prefix="/api/v1/results",    tags=["results"])
+    app.include_router(main_router)
 
     # ── Prometheus metrics ────────────────────
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")

@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = "noreply@example.com"
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24
 
     # ── Monitoring ────────────────────────────
     SENTRY_DSN: str = ""

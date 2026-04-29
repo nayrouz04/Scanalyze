@@ -6,7 +6,7 @@ from alembic import context
 
 from app.config import get_settings
 from app.db.session import Base
-from app.models import User, RefreshToken
+from app.models import User, RefreshToken, PasswordResetToken
 
 # Alembic Config object
 config = context.config
@@ -16,7 +16,7 @@ settings = get_settings()
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Les modèles à surveiller pour générer les migrations
+# Models to monitor for generating migrations
 target_metadata = Base.metadata
 
 

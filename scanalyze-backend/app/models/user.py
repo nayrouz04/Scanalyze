@@ -1,7 +1,7 @@
 """
 app/models/user.py – User ORM model
 """
-#C'est le fichier qui représente la table users dans la base de données
+# This file represents the "users" table in the database
 from __future__ import annotations
 import uuid
 from datetime import date, datetime, timezone
@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import Boolean,Date, DateTime,String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-#Mapped = dit le type Python, mapped_column = crée une colonne en BDD, relationship = lien entre tables
+# Mapped = defines the Python type, mapped_column = creates a DB column, relationship = link between tables
 
 from app.db.session import Base
 
@@ -17,7 +17,6 @@ from app.db.session import Base
 class UserRole(str):
     ADMIN = "admin"
     USER = "user"
-   #VIEWER = "viewer"
 
 
 class User(Base):
@@ -28,9 +27,6 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(
         String(255), unique=True, nullable=False, index=True
-    )
-    username: Mapped[str] = mapped_column(
-        String(50), unique=True, nullable=False, index=True
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
@@ -66,6 +62,9 @@ class User(Base):
     # Relationships
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(  # noqa: F821
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(  # noqa: F821
+        "PasswordResetToken", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

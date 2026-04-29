@@ -9,6 +9,9 @@ POST /auth/logout-all     Revoke all refresh tokens (all devices)
 POST /auth/change-password Change password (authenticated)
 GET  /auth/me             Get current user profile
 """
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
 import logging
 from typing import Annotated
 
@@ -18,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser, get_db
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     LogoutRequest,
     MessageResponse,
@@ -25,6 +29,7 @@ from app.schemas.auth import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UserInfo,
 )
@@ -86,7 +91,7 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Authenticate with email/username + password.
+    Authenticate with email + password.
     Returns a short-lived access token (JWT) and a long-lived refresh token.
 
     - Access token: put in `Authorization: Bearer <token>` header.
@@ -228,3 +233,69 @@ async def change_password(
 async def me(current_user: CurrentUser):
     """Returns the profile of the currently authenticated user."""
     return UserInfo.model_validate(current_user)
+
+# _________ Forgot PWD _______________
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Send a password reset email",
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    request: Request, #reset URL
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Send a password reset email to the user.
+    Always returns success to avoid email enumeration attacks.
+    """
+    try:
+        service = AuthService(db)
+        await service.forgot_password(email=data.email, request=request)
+    except AuthError as e:
+        raise _auth_error_to_http(e)
+
+    return MessageResponse(message="If this email exists, a reset link has been sent.")
+
+#____ Reset PWD ___________________
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Reset password using token",
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Reset the user password using the token received by email.
+    Token is valid for 24 hours and can only be used once.
+    """
+    try:
+        service = AuthService(db)
+        await service.reset_password(
+            token=data.token,
+            new_password=data.new_password,
+        )
+    except AuthError as e:
+        raise _auth_error_to_http(e)
+
+    return MessageResponse(message="Password reset successfully. Please log in again.")
+
+#______ Reset pwd Form ____________
+templates = Jinja2Templates(directory="app/templates")
+@router.get(
+    "/reset-password-form",
+    response_class=HTMLResponse,
+    summary="Display the reset password form",
+)
+async def reset_password_form(request: Request, token: str):
+    """
+    Display the HTML form for resetting the password.
+    The token is passed as a query parameter from the email link.
+    """
+    return templates.TemplateResponse(
+        "reset_password.html",
+        {"request": request, "token": token}
+    )
+

@@ -6,7 +6,7 @@ from alembic import context
 
 from app.config import get_settings
 from app.db.session import Base
-from app.models import User, RefreshToken, PasswordResetToken
+from app.models import User, RefreshToken, PasswordResetToken, EmailVerificationToken
 
 # Alembic Config object
 config = context.config

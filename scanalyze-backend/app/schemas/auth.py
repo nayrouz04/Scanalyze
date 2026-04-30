@@ -52,6 +52,7 @@ class RegisterResponse(BaseModel):
     role: str
     is_active: bool
     is_verified: bool
+    account_enabled: bool
     created_at: datetime
     office_address: str
     phone_nbr: str | None

@@ -20,9 +20,15 @@ from app.core.security import (
 ) #import security functions defined in "security.py"
 from app.models.refresh_token import RefreshToken
 from app.models.reset_token import PasswordResetToken
+from app.models.email_verification_token import EmailVerificationToken
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
-from app.services.email import send_reset_password_email
+from app.services.email import (
+    send_reset_password_email,
+    send_admin_new_user_notification,
+    send_email_verification,
+)
+                                
 from fastapi import Request
 #import database models and the registration schema
 
@@ -50,13 +56,14 @@ class AuthService:
 
     # ── Register ──────────────────────────────────────────────────────────────
 
-    async def register(self, data: RegisterRequest) -> User:
+    async def register(self, data: RegisterRequest, request: Request) -> User:
         # Check email uniqueness
         existing = await self.db.execute(
             select(User).where(User.email == data.email.lower())
         )
         if existing.scalar_one_or_none():
             raise AuthError("Email already registered", 409)
+        is_admin = data.role.value == "admin"
         user = User(
             id=uuid.uuid4(),
             email=data.email.lower(),
@@ -68,11 +75,43 @@ class AuthService:
             birth_date=data.birth_date,
             is_active=True,
             is_verified=False,   # Will be set to True after email verification
+            account_enabled=is_admin,  # True for admin, False for user
         )
         self.db.add(user)
         await self.db.flush()   # get the ID without committing
 
-        logger.info("New user registered: %s", user.email)
+        if is_admin:
+            #generate email verification token for admin
+            raw_token = generate_refresh_token()
+            token_hash = hash_token(raw_token)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            
+            verification_token = EmailVerificationToken(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            )
+            self.db.add(verification_token)
+            await self.db.flush()
+            
+            #build verification URL 
+            base_url = str(request.base_url).rstrip("/")
+            verify_url = f"{base_url}/api/v1/auth/verify-email?token={raw_token}"
+            #send verification email to admin
+            await send_email_verification(
+                email_to=user.email,
+                verify_url=verify_url,
+            )
+            logger.info("Verification email sent to admin: %s", user.email) 
+        else: 
+            #notify admin about new user registration
+            await send_admin_new_user_notification(
+                admin_email=settings.SMTP_USER,
+                user_email=user.email,
+                user_full_name=user.full_name,
+            )
+            logger.info("New user registered: %s", user.email)
         return user
 
     # ── Login ─────────────────────────────────────────────────────────────────
@@ -97,7 +136,10 @@ class AuthService:
 
         if not user.is_active:
             raise AuthError("Account is disabled", 403)
-
+        if user.role == "admin" and not user.is_verified:
+            raise AuthError("Please verify your email before logging in", 403)
+        if user.role == "user" and not user.account_enabled:
+            raise AuthError("Account is pending admin approval",)
         if user.is_locked:
             raise AuthError(
                 f"Account locked. Try again after {user.locked_until.strftime('%H:%M UTC')}",

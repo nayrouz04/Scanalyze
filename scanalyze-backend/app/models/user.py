@@ -39,6 +39,7 @@ class User(Base):
     
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    account_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Login tracking
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
@@ -66,7 +67,9 @@ class User(Base):
     password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(  # noqa: F821
         "PasswordResetToken", back_populates="user", cascade="all, delete-orphan"
     )
-
+    email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
+        "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
+    )
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"
 

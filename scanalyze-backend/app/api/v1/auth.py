@@ -8,6 +8,10 @@ POST /auth/logout         Revoke refresh token
 POST /auth/logout-all     Revoke all refresh tokens (all devices)
 POST /auth/change-password Change password (authenticated)
 GET  /auth/me             Get current user profile
+POST /auth/forgot-password          Send password reset email
+POST /auth/reset-password           Reset password using token
+GET  /auth/reset-password-form      Display reset password HTML form
+GET  /auth/verify-email             Verify admin email address
 """
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -34,6 +38,13 @@ from app.schemas.auth import (
     UserInfo,
 )
 from app.services.auth_service import AuthError, AuthService
+from app.models.email_verification_token import EmailVerificationToken
+from app.core.security import hash_token
+from app.config import get_settings
+from sqlalchemy import select
+from datetime import datetime, timezone
+
+settings = get_settings()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -64,6 +75,7 @@ def _auth_error_to_http(e: AuthError) -> HTTPException:
 )
 async def register(
     data: RegisterRequest,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
@@ -72,7 +84,7 @@ async def register(
     """
     try:
         service = AuthService(db)
-        user = await service.register(data)
+        user = await service.register(data, request)
         return RegisterResponse.model_validate(user)
     except AuthError as e:
         raise _auth_error_to_http(e)
@@ -298,4 +310,94 @@ async def reset_password_form(request: Request, token: str):
         "reset_password.html",
         {"request": request, "token": token}
     )
+#______ verify email _____________
+@router.get(
+    "/verify-email",
+    response_class=HTMLResponse,
+    summary="Verify admin email address",
+)
+async def verify_email(
+    request: Request,
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Verify the admin email address using the token received by email.
+    Token is valid for 24 hours and can only be used once.
+    """
+    from app.models.user import User
+    
+    #find the token in the database
+    token_hash = hash_token(token)
+    result = await db.execute(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token_hash == token_hash
+        )
+    )
+    stored = result.scalar_one_or_none()
+    # Check if token exists
+    if stored is None:
+        return templates.TemplateResponse(
+            "verify_email.html",
+            {
+                "request": request,
+                "success": False,
+                "error_message": "Invalid verification token.",
+                "frontend_url": settings.FRONTEND_URL,
+            }
+        )
+    # Check if token already used
+    if stored.is_used:
+        return templates.TemplateResponse(
+            "verify_email.html",
+            {
+                "request": request,
+                "success": False,
+                "error_message": "This verification link has already been used.",
+                "frontend_url": settings.FRONTEND_URL,
+            }
+        )
+    # Check if token expired
+    if stored.expires_at < datetime.now(timezone.utc):
+        return templates.TemplateResponse(
+            "verify_email.html",
+            {
+                "request": request,
+                "success": False,
+                "error_message": "This verification link has expired.",
+                "frontend_url": settings.FRONTEND_URL,
+            }
+        )
+    #find the user   
+    user_result = await db.execute(
+        select(User).where(User.id == stored.user_id)
+    )
+    user = user_result.scalar_one_or_none()
 
+    if user is None:
+        return templates.TemplateResponse(
+            "verify_email.html",
+            {
+                "request": request,
+                "success": False,
+                "error_message": "User not found.",
+                "frontend_url": settings.FRONTEND_URL,
+            }
+        )  
+    # Mark email as verified
+    user.is_verified = True
+    stored.is_used = True
+    await db.flush()
+
+    logger.info("Email verified successfully for: %s", user.email)
+
+    return templates.TemplateResponse(
+        "verify_email.html",
+        {
+            "request": request,
+            "success": True,
+            "error_message": None,
+            "frontend_url": settings.FRONTEND_URL,
+        }
+    )    
+    

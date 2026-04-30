@@ -1,12 +1,14 @@
 """
 app/services/auth_service.py – Auth business logic (no HTTP concerns here)
 """
-import logging
+#this is the authentication "brain": it contains all business logic — no HTTP, no direct DB handling
+
+import logging #used to display messages in the terminal (exp, "New user registered")
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession # = non-blocking database session
 
 from app.config import get_settings
 from app.core.security import (
@@ -15,15 +17,26 @@ from app.core.security import (
     hash_password,
     hash_token,
     verify_password,
-)
+) #import security functions defined in "security.py"
 from app.models.refresh_token import RefreshToken
+from app.models.reset_token import PasswordResetToken
+from app.models.email_verification_token import EmailVerificationToken
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
+from app.services.email import (
+    send_reset_password_email,
+    send_admin_new_user_notification,
+    send_email_verification,
+)
+                                
+from fastapi import Request
+#import database models and the registration schema
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Lock account after this many failed attempts
+#after 5 wrong passwords → account is locked for 15 minutes
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 
@@ -43,35 +56,62 @@ class AuthService:
 
     # ── Register ──────────────────────────────────────────────────────────────
 
-    async def register(self, data: RegisterRequest) -> User:
+    async def register(self, data: RegisterRequest, request: Request) -> User:
         # Check email uniqueness
         existing = await self.db.execute(
             select(User).where(User.email == data.email.lower())
         )
         if existing.scalar_one_or_none():
             raise AuthError("Email already registered", 409)
-
-        # Check username uniqueness
-        existing_username = await self.db.execute(
-            select(User).where(User.username == data.username.lower())
-        )
-        if existing_username.scalar_one_or_none():
-            raise AuthError("Username already taken", 409)
-
+        is_admin = data.role.value == "admin"
         user = User(
             id=uuid.uuid4(),
             email=data.email.lower(),
-            username=data.username.lower(),
             hashed_password=hash_password(data.password),
-            full_name=data.full_name,
-            role="user",
+            full_name=data.full_name.strip(),
+            role=data.role.value, #"admin" or "user" from RoleEnum
+            office_address =data.office_address,
+            phone_nbr=data.phone_nbr,
+            birth_date=data.birth_date,
             is_active=True,
-            is_verified=False,   # set True after email verification flow
+            is_verified=False,   # Will be set to True after email verification
+            account_enabled=is_admin,  # True for admin, False for user
         )
         self.db.add(user)
         await self.db.flush()   # get the ID without committing
 
-        logger.info("New user registered: %s", user.email)
+        if is_admin:
+            #generate email verification token for admin
+            raw_token = generate_refresh_token()
+            token_hash = hash_token(raw_token)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            
+            verification_token = EmailVerificationToken(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            )
+            self.db.add(verification_token)
+            await self.db.flush()
+            
+            #build verification URL 
+            base_url = str(request.base_url).rstrip("/")
+            verify_url = f"{base_url}/api/v1/auth/verify-email?token={raw_token}"
+            #send verification email to admin
+            await send_email_verification(
+                email_to=user.email,
+                verify_url=verify_url,
+            )
+            logger.info("Verification email sent to admin: %s", user.email) 
+        else: 
+            #notify admin about new user registration
+            await send_admin_new_user_notification(
+                admin_email=settings.SMTP_USER,
+                user_email=user.email,
+                user_full_name=user.full_name,
+            )
+            logger.info("New user registered: %s", user.email)
         return user
 
     # ── Login ─────────────────────────────────────────────────────────────────
@@ -96,7 +136,10 @@ class AuthService:
 
         if not user.is_active:
             raise AuthError("Account is disabled", 403)
-
+        if user.role == "admin" and not user.is_verified:
+            raise AuthError("Please verify your email before logging in", 403)
+        if user.role == "user" and not user.account_enabled:
+            raise AuthError("Account is pending admin approval",)
         if user.is_locked:
             raise AuthError(
                 f"Account locked. Try again after {user.locked_until.strftime('%H:%M UTC')}",
@@ -204,15 +247,101 @@ class AuthService:
         # Revoke all refresh tokens — force re-login on all devices
         await self.logout_all(user.id)
         await self.db.flush()
+    
+    #_____ Forgot PWD _____________________
+    async def forgot_password(self, email: str, request: Request) -> None:
+        """Generate a reset token and send it by email."""
+        # Find user by email
+        result = await self.db.execute(
+            select(User).where(User.email == email.lower())
+        )
+        user = result.scalar_one_or_none()
 
+        #always return success to avoid email enumeration
+        if user is None:
+            return
+
+        #generate a raw token and hash it for storage
+        raw_token = generate_refresh_token()
+        token_hash = hash_token(raw_token)
+
+        #save the token in the database
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS
+        )
+        reset_token = PasswordResetToken(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self.db.add(reset_token)
+        await self.db.flush()
+
+        #build the reset URL
+        base_url = str(request.base_url).rstrip("/")
+        reset_url = f"{base_url}/api/v1/auth/reset-password-form?token={raw_token}"
+
+        #send the email
+        await send_reset_password_email(email_to=user.email, reset_url=reset_url)
+        logger.info("Password reset email sent to: %s", user.email)
+        
+    # ── Reset Password ────────────────────────────────────────────────────────
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        """Verify the reset token and update the password."""
+
+        token_hash = hash_token(token)
+
+        #find the token in the database
+        result = await self.db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.token_hash == token_hash
+            )
+        )
+        stored = result.scalar_one_or_none()
+
+        #check if token exists
+        if stored is None:
+            raise AuthError("Invalid reset token", 400)
+
+        #check if token is already used
+        if stored.is_used:
+            raise AuthError("Reset token has already been used", 400)
+
+        #check if token is expired
+        if stored.expires_at < datetime.now(timezone.utc):
+            raise AuthError("Reset token has expired", 400)
+
+        #find the user
+        user_result = await self.db.execute(
+            select(User).where(User.id == stored.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if user is None or not user.is_active:
+            raise AuthError("User not found or disabled", 400)
+
+        #update the password
+        user.hashed_password = hash_password(new_password)
+
+        #mark token as used
+        stored.is_used = True
+
+        #revoke all refresh tokens — force re-login on all devices
+        await self.logout_all(user.id)
+        await self.db.flush()
+
+        logger.info("Password reset successfully for: %s", user.email)   
+    
     # ── Private helpers ───────────────────────────────────────────────────────
 
     async def _get_user_by_login(self, login: str) -> User | None:
-        """Find user by email OR username."""
+        """Find user by email """
         login = login.lower().strip()
         result = await self.db.execute(
             select(User).where(
-                (User.email == login) | (User.username == login)
+                (User.email == login)
             )
         )
         return result.scalar_one_or_none()

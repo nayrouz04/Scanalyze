@@ -20,11 +20,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
+# Transforme "Nayrouz123!" en "$2b$12$xK9..." — irréversible, personne ne peut retrouver le vrai mot de passe
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
-
+# Vérifie si le mot de passe tapé correspond au hash stocké en BDD — retourne True ou False
 
 # ── Token hashing (for DB storage of refresh tokens) ─────────────────────────
 
@@ -43,7 +44,7 @@ def generate_refresh_token() -> str:
 ALGORITHM = "HS256"
 
 
-def create_access_token(
+def create_access_token( #cree un JWT(token de connexion)
     subject: str,
     role: str,
     extra: dict[str, Any] | None = None,
@@ -56,18 +57,18 @@ def create_access_token(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     payload: dict[str, Any] = {
-        "sub": subject,
-        "role": role,
-        "type": "access",
-        "exp": expires_at,
-        "iat": datetime.now(timezone.utc),
+        "sub": subject, #l'id de user
+        "role": role, #son role(user/admin)
+        "type": "access", # c'est un token d'acces
+        "exp": expires_at, #quand il expire
+        "iat": datetime.now(timezone.utc), # quand il a été créé
     }
     if extra:
         payload.update(extra)
 
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM), expires_at
 
-
+# Lit et vérifie un JWT — si le token est faux ou expiré → erreur automatique
 def decode_access_token(token: str) -> dict[str, Any]:
     """
     Decode and validate an access token.

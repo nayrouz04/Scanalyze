@@ -1,52 +1,50 @@
-//Hook pour gerer les etats locaux 
+// UploadPanel — allows users to select and upload a document for OCR processing
+// Sends the file to the backend via RTK Query mutation
 import { useState } from "react";
-//Box : conteneur avec style inline 
-//Button : bouton stylisé
-//Typography : texte stylisé
-//CircularProgress : spinner de chargement
 import { Box, Button, Typography, CircularProgress } from "@mui/material";
-//Hook RTK Query pour envoyer un fichier au backend 
-import { useUploadDocumentMutation } from "../../services/api";
+import { useUploadDocumentMutation } from "@services";
+import { colors } from "@theme";
 
 export default function UploadPanel() {
-  //stockee le fichier selectionné
+  // Stores the currently selected file (null when none is selected)
   const [file, setFile] = useState<File | null>(null);
-  //uploadDocument: fonction pour envoyer le fichier
-  //isLoading: true pendant l'envoie
-  //is Success : true aprés un envoie reussi 
-  const [uploadDocument, { isLoading, isSuccess }] =
-    useUploadDocumentMutation();
-  
-  //Securité : si aucun fichier selectionné , ne fait rien   
+
+  // uploadDocument — sends the file to the backend
+  // isLoading     — true while the request is in flight
+  // isSuccess     — true after a successful upload
+  const [uploadDocument, { isLoading, isSuccess }] = useUploadDocumentMutation();
+
   const handleUpload = async () => {
+    // Guard: do nothing if no file has been selected
     if (!file) return;
 
-    //crée un fichier FormData et y ajoute le fichier , C'est le format standart pour envoyer des fichiers HTTP 
+    // Wrap the file in FormData — standard format for HTTP file uploads
     const formData = new FormData();
     formData.append("file", file);
 
-    //.unwrap() : lance une exception si'lupload échoue 
-    //setFile(null) réinitialise le fichier aprés succés
-    //catch : affiche l'erreur dans la console si l'upload échoue 
     try {
+      // .unwrap() re-throws any server error so it can be caught below
       await uploadDocument(formData).unwrap();
+      // Reset the file input after a successful upload
       setFile(null);
     } catch (err) {
-      console.error(err);
+      console.error("Upload failed:", err);
     }
   };
 
   return (
-    <Box sx={{ background: "#111827", p: 3, borderRadius: 2, color: "white" }}>
+    <Box sx={{ background: colors.bgCard, p: 3, borderRadius: 2, color: colors.textWhite }}>
       <Typography variant="h6" mb={2}>
         Upload Document (OCR)
       </Typography>
 
+      {/* Native file input — triggers file picker dialog */}
       <input
         type="file"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
       />
 
+      {/* Upload button — disabled while loading or when no file is selected */}
       <Button
         sx={{ mt: 2 }}
         variant="contained"
@@ -63,6 +61,7 @@ export default function UploadPanel() {
         )}
       </Button>
 
+      {/* Success message shown after a successful upload */}
       {isSuccess && (
         <Typography mt={2} color="success.main">
           ✔ File uploaded successfully

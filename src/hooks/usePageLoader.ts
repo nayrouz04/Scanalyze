@@ -1,24 +1,28 @@
-//useEffects : declenche du code quand une valeur change
-//useState: gere l'etat local loading
+// usePageLoader — custom hook that shows a loading state on every page navigation
+// Returns true for `duration` ms after each route change, then false
 import { useEffect, useState } from "react";
-//Hook qui retourne la localisation actuelle , permet de detecter les changements de page 
 import { useLocation } from "react-router-dom";
 
-//hook personnalisé (duration=500)
-export function usePageLoader(duration = 500) {
-  //recupere la localisation courante 
+export function usePageLoader(duration: number = 500): boolean {
+  // Detect the current route
   const location = useLocation();
-  const [loading, setLoading] = useState(false);
+  // true while the loader should be visible
+  const [loading, setLoading] = useState<boolean>(false);
 
-  //quand la page change , active immediatement le loader 
   useEffect(() => {
+    // Immediately show the loader when the route changes
     setLoading(true);
-    //apres duration (500 ms par defaut) , desactive le loader automatiquement 
-    const timer = setTimeout(() => setLoading(false), duration);
-    //si l'utilisateur navigue vers une page avant la fin du timer , annule l'ancien timr pour eviter des conflits
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
 
-  //retourne l'etat loading utilisé dans DashboardLayout.tsx
+    // Automatically hide it after `duration` milliseconds
+    const timer: ReturnType<typeof setTimeout> = setTimeout(
+      (): void => setLoading(false),
+      duration
+    );
+
+    // If the user navigates again before the timer fires, cancel the old timer
+    // to avoid stale state updates
+    return (): void => clearTimeout(timer);
+  }, [location.pathname, duration]);
+
   return loading;
 }

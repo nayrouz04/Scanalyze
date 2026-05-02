@@ -1,60 +1,56 @@
+// DocumentStepper — vertical stepper showing the document processing pipeline
+// Displayed in the Sidebar for non-admin users
+// Steps are locked until the previous one is completed
 import { Box, Stepper, Step, StepButton, StepLabel, Tooltip, Typography } from "@mui/material";
-import CloudUploadIcon  from "@mui/icons-material/CloudUpload";
-import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
-import EditIcon         from "@mui/icons-material/Edit";
-import FileDownloadIcon from "@mui/icons-material/FileDownload";
-import { useNavigate }  from "react-router-dom";
-import { useStepper }   from "./StepperContext";
-import { colors }       from "../../theme";
-
-const STEP_CONFIG = [
-  { label: "Upload",       icon: <CloudUploadIcon  sx={{ fontSize: 16 }} />, path: "/upload"       },
-  { label: "Verification", icon: <VerifiedUserIcon sx={{ fontSize: 16 }} />, path: "/verification" },
-  { label: "Editor",       icon: <EditIcon         sx={{ fontSize: 16 }} />, path: "/editor"       },
-  { label: "Export",       icon: <FileDownloadIcon sx={{ fontSize: 16 }} />, path: "/export"       },
-];
+import { useNavigate }                from "react-router-dom";
+import { useStepper }                 from "./useStepper";
+import { STEP_CONFIG }                from "@constants";
+import { colors, stepperSx, stepperTokens } from "@theme";
 
 export const DocumentStepper = () => {
   const navigate = useNavigate();
   const { activeStep, completedSteps, canAccessStep, goToStep } = useStepper();
 
+  // Navigate to the step's route if it is accessible
   const handleClick = (i: number) => {
     if (!canAccessStep(i)) return;
     goToStep(i);
     navigate(STEP_CONFIG[i].path);
   };
 
-  const iconBg = (i: number, completed: boolean) => {
-    if (completed)      return colors.green;
-    if (i === activeStep) return colors.blue;
-    if (canAccessStep(i)) return colors.bgHover;
-    return colors.bgCard;
+  // Returns the background color for each step icon based on its state.
+  // Uses stepperTokens (raw color values) — NOT sx props — to avoid DOM prop leakage.
+  const iconBg = (i: number, completed: boolean): string => {
+    if (completed)        return stepperTokens.icon.completed;
+    if (i === activeStep) return stepperTokens.icon.active;
+    if (canAccessStep(i)) return stepperTokens.icon.accessible;
+    return stepperTokens.icon.locked;
   };
 
   return (
     <Box sx={{ px: 1, py: 1 }}>
+      {/* Section label above the stepper */}
       <Typography variant="caption" sx={{
-        color: colors.textMuted,
-        px: 1, mb: 1,
-        display: "block",
+        color:         colors.textMuted,
+        px:            1,
+        mb:            1,
+        display:       "block",
         textTransform: "uppercase",
         letterSpacing: 1,
-        fontSize: 10,
+        fontSize:      10,
       }}>
         Processing
       </Typography>
 
+      {/*
+       * stepperSx is a flat MUI sx object using CSS selectors.
+       * MUI resolves these internally to CSS — minHeight never reaches the DOM as a prop.
+       */}
       <Stepper
         activeStep={activeStep}
         orientation="vertical"
         nonLinear
-        sx={{
-          "& .MuiStepConnector-line":              { borderColor: colors.border, minHeight: 16 },
-          "& .MuiStepLabel-label":                 { color: colors.textMuted,    fontSize: "0.875rem" },
-          "& .MuiStepLabel-label.Mui-active":      { color: colors.textWhite,    fontWeight: 600 },
-          "& .MuiStepLabel-label.Mui-completed":   { color: colors.textSecondary },
-          "& .MuiStepLabel-label.Mui-disabled":    { color: colors.border },
-        }}
+        sx={stepperSx}
       >
         {STEP_CONFIG.map((step, i) => {
           const completed  = completedSteps.has(i);
@@ -62,8 +58,9 @@ export const DocumentStepper = () => {
 
           return (
             <Step key={step.label} completed={completed} disabled={!accessible}>
+              {/* Tooltip shown only when the step is locked */}
               <Tooltip
-                title={!accessible ? "Complétez l'étape précédente d'abord" : ""}
+                title={!accessible ? "Complete the previous step first" : ""}
                 placement="right"
                 arrow
               >
@@ -72,22 +69,26 @@ export const DocumentStepper = () => {
                     onClick={() => handleClick(i)}
                     disabled={!accessible}
                     icon={
+                      // Custom circular icon with dynamic background color
                       <Box sx={{
-                        width: 28, height: 28,
-                        borderRadius: "50%",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        bgcolor: iconBg(i, completed),
-                        color:   accessible ? colors.textWhite : colors.textMuted,
-                        transition: "all 0.2s",
+                        width:          28,
+                        height:         28,
+                        borderRadius:   "50%",
+                        display:        "flex",
+                        alignItems:     "center",
+                        justifyContent: "center",
+                        bgcolor:        iconBg(i, completed),
+                        color:          accessible ? colors.textWhite : colors.textMuted,
+                        transition:     "all 0.2s",
                       }}>
                         {step.icon}
                       </Box>
                     }
                     sx={{
-                      py: 0.5,
+                      py:           0.5,
                       borderRadius: 1,
-                      cursor: accessible ? "pointer" : "not-allowed",
-                      "&:hover": { bgcolor: accessible ? colors.bgHover : "transparent" },
+                      cursor:       accessible ? "pointer" : "not-allowed",
+                      "&:hover":    { bgcolor: accessible ? colors.bgHover : "transparent" },
                     }}
                   >
                     <StepLabel>{step.label}</StepLabel>

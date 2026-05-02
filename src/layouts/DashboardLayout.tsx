@@ -1,38 +1,45 @@
-import { Box } from "@mui/material";
-import Sidebar from "../components/common/Sidebar";
-import Topbar from "../components/common/Topbar";
-//placeholder qui afficher la page enfant correspondant à la route activ, c'est le contenu qui change selon l'URL
-import { Outlet } from "react-router-dom";
-import { colors } from "../theme";
-import PageLoader from "../components/common/PageLoader";
-//hook qui gere le timer de chargement
-import { usePageLoader } from "../hooks/usePageLoader";
-//hook typé pour lire le store Redux
-import { useAppSelector } from "../app/hooks";
-
-const drawerWidth = 260;
+// DashboardLayout — root layout for all authenticated pages
+// Renders the Sidebar, Topbar, and the current page via <Outlet />
+// Shows a full-screen PageLoader on every route transition
+import { Box }           from "@mui/material";
+import { Outlet }        from "react-router-dom";
+import Sidebar           from "@components/common/Sidebar";
+import Topbar            from "@components/common/Topbar";
+import PageLoader        from "@components/common/PageLoader";
+import { usePageLoader } from "@hooks/usePageLoader";
+import { useAppSelector} from "@app/hooks";
+import { colors }        from "@theme";
 
 export default function DashboardLayout() {
   const loading = usePageLoader(600);
-  //rcupre l'utilisateur connecté depuis Redux
   const { user } = useAppSelector((state) => state.auth);
 
-  if (loading) return <PageLoader />;  // ← affiche le loader plein écran
+  if (loading) return <PageLoader />;
 
   return (
-    <Box display="flex" minHeight="100vh" bgcolor={colors.bgPage}>
+    // MUI permanent Drawer creates a flex wrapper that reserves drawerWidth
+    // automatically — no ml needed on the main box.
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: colors.bgPage }}>
+
       <Sidebar />
+
+      {/*
+       * flexGrow:1 fills whatever space remains after the Drawer wrapper.
+       * NO ml here — the Drawer's own wrapper div already pushes us right.
+       * Adding ml on top of that was causing the double-offset bug.
+       */}
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
-          width: `calc(100% - ${drawerWidth}px)`,
-          ml: `${drawerWidth}px`,
-          bgcolor: colors.bgPage,
+          flexGrow:      1,
+          minWidth:      0,
+          display:       "flex",
+          flexDirection: "column",
+          bgcolor:       colors.bgPage,
         }}
       >
         <Topbar userName={user?.name} />
-        <Box p={3}>
+        <Box sx={{ p: 3, flexGrow: 1 }}>
           <Outlet />
         </Box>
       </Box>

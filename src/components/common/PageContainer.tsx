@@ -1,8 +1,10 @@
-//composant wrapper son role est d'ajouter un padding uniforme de 24 px autour de toutes les pages pour que le contenu ne colle pas aux bord 
-
+// PageContainer — layout wrapper component
+// Adds uniform 24px padding around all page content
+// so nothing sticks to the edges of the viewport
 import { Box } from "@mui/material";
+import type { ReactNode } from "react";
 
-type Props = { children: React.ReactNode };
+type Props = { children: ReactNode };
 
 export default function PageContainer({ children }: Props) {
   return <Box p={3}>{children}</Box>;

@@ -1,109 +1,108 @@
+// Upload — drag-and-drop file upload page
+// Accepts PDF, XLSX, and CSV files up to 20MB
+// Sends the file to the backend via RTK Query mutation
 import { useState, useRef, DragEvent } from "react";
-import { Box, Button, Typography, CircularProgress, Snackbar, Alert, IconButton } from "@mui/material";
-import UploadFileIcon     from "@mui/icons-material/UploadFile";
-import CloseIcon          from "@mui/icons-material/Close";
-import TaskAltIcon        from "@mui/icons-material/TaskAlt";
+import {
+  Box, Button, Typography, CircularProgress,
+  Snackbar, Alert, IconButton,
+} from "@mui/material";
+import UploadFileIcon      from "@mui/icons-material/UploadFile";
+import CloseIcon           from "@mui/icons-material/Close";
+import TaskAltIcon         from "@mui/icons-material/TaskAlt";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
-import ArrowForwardIcon   from "@mui/icons-material/ArrowForward";
-import { useUploadDocumentMutation } from "../../services/api";
-import { colors } from "../../theme";
-
+import ArrowForwardIcon    from "@mui/icons-material/ArrowForward";
+import { useUploadDocumentMutation } from "@services";
+import { colors }                    from "@theme";
 
 export default function Upload() {
+  // Currently selected file (null when no file is chosen)
   const [file,      setFile]      = useState<File | null>(null);
-  const [dragging,  setDragging]  = useState(false);
-  const [snackOpen, setSnackOpen] = useState(false);
+  // true while the user is dragging a file over the drop zone
+  const [dragging,  setDragging]  = useState<boolean>(false);
+  // Controls the success snackbar visibility
+  const [snackOpen, setSnackOpen] = useState<boolean>(false);
+
+  // Hidden file input reference — triggered by the "Select Files" button
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // uploadDocument — RTK Query mutation for sending the file to the backend
+  // reset         — clears the mutation state when a new file is selected
   const [uploadDocument, { isLoading, reset }] = useUploadDocumentMutation();
-  
+
+  // Set the selected file and clear any previous mutation result
   const handleFile = (f: File) => { setFile(f); reset(); };
 
+  // Handle file drop — prevent default browser behavior then extract the dropped file
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); setDragging(false);
+    e.preventDefault();
+    setDragging(false);
     const dropped = e.dataTransfer.files?.[0];
     if (dropped) handleFile(dropped);
   };
 
   const handleUpload = async () => {
     if (!file) return;
+    // Wrap the file in FormData — standard format for HTTP multipart file uploads
     const formData = new FormData();
     formData.append("file", file);
     try {
+      // .unwrap() re-throws server errors so they are caught below
       await uploadDocument(formData).unwrap();
-      setSnackOpen(true); setFile(null);
-    } catch (err) { console.error("Upload failed", err); }
+      setSnackOpen(true);
+      setFile(null);
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
   };
 
-
-
-
   return (
-    <Box
-      sx={{
-        p: { xs: 2, md: 4 },
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
+    <Box sx={{ p: { xs: 2, md: 4 }, display: "flex", flexDirection: "column", alignItems: "center" }}>
       <Box sx={{ width: "100%", maxWidth: 760 }}>
+
         {/* Breadcrumb */}
-        <Typography
-          variant="caption"
-          sx={{
-            color: colors.blueMuted,
-            letterSpacing: 2,
-            fontSize: 11,
-            textTransform: "uppercase",
-          }}
-        >
+        <Typography variant="caption" sx={{
+          color: colors.blueMuted, letterSpacing: 2, fontSize: 11, textTransform: "uppercase",
+        }}>
           Home / Uploads
         </Typography>
 
-        {/* Titre stylisé */}
-        <Typography
-          variant="h4"
-          fontWeight={700}
-          color={colors.textWhite}
-          mt={0.5}
+        {/* Page title */}
+        <Typography variant="h4" fontWeight={700} color={colors.textWhite} mt={0.5}
           sx={{ fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em" }}
         >
           Document{" "}
-          <Box component="span" sx={{ color: colors.blue }}>
-            Management
-          </Box>
+          <Box component="span" sx={{ color: colors.blue }}>Management</Box>
         </Typography>
 
         <Typography variant="body2" color={colors.textMuted} mb={4}>
           Centralized hub for file ingestion and processing status.
         </Typography>
 
-        {/* Card principale */}
-        <Box
-          sx={{
-            background: `linear-gradient(135deg, ${colors.bgDark} 0%, ${colors.bgCard} 100%)`,
-            border: `1px solid ${colors.borderCard}`,
-            borderRadius: 3,
-            p: { xs: 3, md: 5 },
-          }}
-        >
-          {/* Drop Zone */}
+        {/* Main card */}
+        <Box sx={{
+          background:   `linear-gradient(135deg, ${colors.bgDark} 0%, ${colors.bgCard} 100%)`,
+          border:       `1px solid ${colors.borderCard}`,
+          borderRadius: 3,
+          p:            { xs: 3, md: 5 },
+        }}>
+          {/* ── Drop Zone ── */}
           <Box
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => inputRef.current?.click()}
             sx={{
-              border: `2px dashed ${dragging ? colors.blue : colors.blueButton}`,
+              border:     `2px dashed ${dragging ? colors.blue : colors.blueButton}`,
               borderRadius: 2,
-              p: { xs: 4, md: 6 },
-              textAlign: "center",
-              cursor: "pointer",
+              p:          { xs: 4, md: 6 },
+              textAlign:  "center",
+              cursor:     "pointer",
               transition: "all 0.2s",
               background: dragging ? "#1e3a5f22" : "transparent",
-              "&:hover": { borderColor: colors.blue, background: "#1e3a5f11" },
+              "&:hover":  { borderColor: colors.blue, background: "#1e3a5f11" },
             }}
           >
+            {/* Hidden native file input */}
             <input
               ref={inputRef}
               type="file"
@@ -112,23 +111,23 @@ export default function Upload() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             />
 
-            <Box
-              sx={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: "#1e3a8a22",
-                border: `1px solid ${colors.blueButton}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                mx: "auto", mb: 2,
-              }}
-            >
+            {/* Upload icon */}
+            <Box sx={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: "#1e3a8a22", border: `1px solid ${colors.blueButton}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              mx: "auto", mb: 2,
+            }}>
               <UploadFileIcon sx={{ color: colors.blue, fontSize: 30 }} />
             </Box>
 
+            {/* File selected state — shows file name and size */}
             {file ? (
               <Box>
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mb: 1 }}>
                   <InsertDriveFileIcon sx={{ color: colors.blueMuted, fontSize: 20 }} />
                   <Typography color={colors.textWhite} fontWeight="medium">{file.name}</Typography>
+                  {/* Clear button — stops propagation to avoid re-opening file picker */}
                   <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); setFile(null); reset(); }}
@@ -142,6 +141,7 @@ export default function Upload() {
                 </Typography>
               </Box>
             ) : (
+              // Empty state — prompt to drag or select a file
               <>
                 <Typography color={colors.textWhite} fontWeight="medium" mb={0.5}>
                   Drag and drop files here
@@ -153,7 +153,7 @@ export default function Upload() {
             )}
           </Box>
 
-          {/* Bouton select */}
+          {/* Select file button — shown only when no file is selected */}
           {!file && (
             <Box sx={{ textAlign: "center", mt: 2 }}>
               <Button
@@ -161,14 +161,9 @@ export default function Upload() {
                 onClick={() => inputRef.current?.click()}
                 startIcon={<UploadFileIcon />}
                 sx={{
-                  borderColor: colors.blueButton,
-                  color: colors.textWhite,
-                  bgcolor: colors.blueDeep,
-                  "&:hover": { bgcolor: colors.blueButton, borderColor: colors.blue },
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  fontSize: 13,
-                  px: 3,
+                  borderColor: colors.blueButton, color: colors.textWhite, bgcolor: colors.blueDeep,
+                  "&:hover":   { bgcolor: colors.blueButton, borderColor: colors.blue },
+                  textTransform: "uppercase", letterSpacing: 1, fontSize: 13, px: 3,
                 }}
               >
                 Select Files From Computer
@@ -176,7 +171,7 @@ export default function Upload() {
             </Box>
           )}
 
-          {/* Bouton Next */}
+          {/* Upload / Next button */}
           <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
             <Button
               variant="contained"
@@ -188,9 +183,7 @@ export default function Upload() {
               onClick={handleUpload}
               disabled={!file || isLoading}
               sx={{
-                px: 4,
-                fontWeight: "bold",
-                letterSpacing: 1,
+                px: 4, fontWeight: "bold", letterSpacing: 1,
                 "&:disabled": { bgcolor: colors.bgHover, color: "#475569" },
               }}
             >
@@ -200,7 +193,7 @@ export default function Upload() {
         </Box>
       </Box>
 
-      {/* Snackbar succès */}
+      {/* Success snackbar — shown after a successful upload */}
       <Snackbar
         open={snackOpen}
         autoHideDuration={4000}

@@ -1,35 +1,40 @@
-//Box : contnur avc styles inline 
-import { Box, Typography } from "@mui/material";
-//Hokk RTK Query pour recuperer les données d'activites OCR depuis le backend 
-import { useGetActivityQuery } from "../../services/api";
-//Composants de labiblitheque Recharts pour creer le graphique 
+// ResultsTable — displays a table of processed documents with their OCR results
+// Fetches data from the backend via RTK Query
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  Table, TableHead, TableRow,
+  TableCell, TableBody, Box,
+} from "@mui/material";
+import { useGetResultsQuery } from "@services";
+import { colors } from "@theme";
 
-export default function OcrChart() {
-  //Appel API / recupre les données d'activité , tableau vide par defaut si pas encor chargé 
-  const { data = [] } = useGetActivityQuery();
+// Shared cell styles — white text on dark background with subtle border
+const cellSx = { color: colors.textWhite, borderColor: colors.border };
+
+export default function ResultsTable() {
+  // Fetch processed documents; default to empty array while loading
+  const { data = [] } = useGetResultsQuery();
 
   return (
-    <Box sx={{ background: "#111827", p: 2, borderRadius: 2, mt: 2 }}>
-      <Typography mb={2} color="white">
-        OCR Activity (Documents processed)
-      </Typography>
+    <Box sx={{ bgcolor: colors.bgCard, p: 2, borderRadius: 2 }}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell sx={cellSx}>File</TableCell>
+            <TableCell sx={cellSx}>Status</TableCell>
+            <TableCell sx={cellSx}>Extracted Text</TableCell>
+          </TableRow>
+        </TableHead>
 
-      <ResponsiveContainer width="100%" height={250}>
-        <LineChart data={data}>
-          <XAxis dataKey="day" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="documents" stroke="#60a5fa" />
-        </LineChart>
-      </ResponsiveContainer>
+        <TableBody>
+          {data.map((doc: any) => (
+            <TableRow key={doc.id}>
+              <TableCell sx={cellSx}>{doc.name}</TableCell>
+              <TableCell sx={cellSx}>{doc.status}</TableCell>
+              <TableCell sx={cellSx}>{doc.text}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Box>
   );
 }

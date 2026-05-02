@@ -1,42 +1,36 @@
-//composant MUI pour construire le tableau:
-//table :conteneur principal du tableau
-//TableHead : section des en-tetes 
-//TableRow : une ligne du tableau 
-//TableCell: colonne
-//TableBody: section des données
-//Box:conteneur avec styles inline 
+// ResultsTable — displays a table of processed documents with their OCR results
+// Fetches data from the backend via RTK Query
 import {
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Box,
+  Table, TableHead, TableRow,
+  TableCell, TableBody, Box,
 } from "@mui/material";
-//Hook RTK Query pour recuperer les documents traités depuis le backend 
-import { useGetResultsQuery } from "../../services/api";
+import { useGetResultsQuery } from "@services";
+import { colors } from "@theme";
+
+// Shared cell styles — white text on dark background with subtle border
+const cellSx = { color: colors.textWhite, borderColor: colors.border };
 
 export default function ResultsTable() {
-  //Appel API tableau vide par defaut si pas encore chargé 
+  // Fetch processed documents; default to empty array while loading
   const { data = [] } = useGetResultsQuery();
 
   return (
-    <Box sx={{ bgcolor: "#111827", p: 2, borderRadius: 2 }}>
+    <Box sx={{ bgcolor: colors.bgCard, p: 2, borderRadius: 2 }}>
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>File</TableCell>
-            <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>Status</TableCell>
-            <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>Extracted Text</TableCell>
+            <TableCell sx={cellSx}>File</TableCell>
+            <TableCell sx={cellSx}>Status</TableCell>
+            <TableCell sx={cellSx}>Extracted Text</TableCell>
           </TableRow>
         </TableHead>
 
         <TableBody>
           {data.map((doc: any) => (
             <TableRow key={doc.id}>
-              <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>{doc.name}</TableCell>
-              <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>{doc.status}</TableCell>
-              <TableCell sx={{ color: "white", borderColor: "#1f2937" }}>{doc.text}</TableCell>
+              <TableCell sx={cellSx}>{doc.name}</TableCell>
+              <TableCell sx={cellSx}>{doc.status}</TableCell>
+              <TableCell sx={cellSx}>{doc.text}</TableCell>
             </TableRow>
           ))}
         </TableBody>

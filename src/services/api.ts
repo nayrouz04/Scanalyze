@@ -1,79 +1,137 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { ApiUrls }                   from "../constants/ApiUrls";
+import { API_TAGS }                  from "../constants/apiConstants";
+
+/**
+ * api — the main RTK Query API slice.
+ *
+ * Covers:
+ *   - Documents : upload, results, stats, activity
+ *   - Users     : CRUD + activation toggle (admin only)
+ *
+ * Authentication endpoints live in authApi.ts.
+ * Document-specific endpoints live in documentsApi.ts.
+ */
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+/** User — clean model for a user account */
+export interface User {
+  id?:       string;
+  fullName:  string;
+  email:     string;
+  role:      "admin" | "user";
+  password?: string;
+  active?:   boolean;
+}
+
+/** UserPatch — partial update payload for an existing user */
+export interface UserPatch {
+  id:        string;
+  fullName?: string;
+  role?:     string;
+  active?:   boolean;
+}
+
+/** ToggleActive — payload for toggling a user's active status */
+export interface ToggleActive {
+  id:     string;
+  active: boolean;
+}
+
+// ─── API slice ───────────────────────────────────────────────────────────────
 
 export const api = createApi({
   reducerPath: "api",
+
+  // Base URL comes from ApiUrls — single source of truth for all API URLs
   baseQuery: fetchBaseQuery({
-    baseUrl: "http://localhost:5000/",
+    baseUrl: ApiUrls.BASE_URL,
   }),
-  tagTypes: ["Documents", "Users"],
+
+  // Cache tag types used for automatic cache invalidation
+  tagTypes: [API_TAGS.DOCUMENTS, API_TAGS.USERS],
 
   endpoints: (builder) => ({
-    // ─── Documents ───────────────────────────────────────────
+
+    // ─── Documents ───────────────────────────────────────────────────────────
+
+    /** Upload a document (multipart/form-data) */
     uploadDocument: builder.mutation({
       query: (file: FormData) => ({
-        url: "upload",
+        url:    ApiUrls.UPLOAD,
         method: "POST",
-        body: file,
+        body:   file,
       }),
-      invalidatesTags: ["Documents"],
+      invalidatesTags: [API_TAGS.DOCUMENTS],
     }),
 
+    /** Fetch all processed document results */
     getResults: builder.query({
-      query: () => "results",
-      providesTags: ["Documents"],
+      query:        () => ApiUrls.RESULTS,
+      providesTags: [API_TAGS.DOCUMENTS],
     }),
 
+    /** Fetch dashboard stats (counts, success rate, etc.) */
     getStats: builder.query({
-      query: () => "stats",
+      query: () => ApiUrls.STATS,
     }),
 
+    /** Fetch recent activity for the dashboard feed */
     getActivity: builder.query({
-      query: () => "activity",
+      query: () => ApiUrls.ACTIVITY,
     }),
 
-    // ─── Users ───────────────────────────────────────────────
+    // ─── Users ───────────────────────────────────────────────────────────────
+
+    /** Fetch all users (admin only) */
     getUsers: builder.query({
-      query: () => "users",
-      providesTags: ["Users"],
+      query:        () => ApiUrls.USERS,
+      providesTags: [API_TAGS.USERS],
     }),
 
+    /** Create a new user account (admin only) */
     createUser: builder.mutation({
-      query: (user: { fullName: string; email: string; role: "admin" | "user"; password: string }) => ({
-        url: "users",
+      query: (user: User) => ({
+        url:    ApiUrls.USERS,
         method: "POST",
-        body: user,
+        body:   user,
       }),
-      invalidatesTags: ["Users"],
+      invalidatesTags: [API_TAGS.USERS],
     }),
 
+    /** Update a user's details (admin only) */
     updateUser: builder.mutation({
-      query: ({ id, ...patch }: { id: string; fullName?: string; role?: string; active?: boolean }) => ({
-        url: `users/${id}`,
+      query: ({ id, ...patch }: UserPatch) => ({
+        url:    ApiUrls.USER_BY_ID(id),
         method: "PATCH",
-        body: patch,
+        body:   patch,
       }),
-      invalidatesTags: ["Users"],
+      invalidatesTags: [API_TAGS.USERS],
     }),
 
+    /** Delete a user account (admin only) */
     deleteUser: builder.mutation({
       query: (id: string) => ({
-        url: `users/${id}`,
+        url:    ApiUrls.USER_BY_ID(id),
         method: "DELETE",
       }),
-      invalidatesTags: ["Users"],
+      invalidatesTags: [API_TAGS.USERS],
     }),
 
+    /** Toggle a user's active/inactive status (admin only) */
     toggleUserActive: builder.mutation({
-      query: ({ id, active }: { id: string; active: boolean }) => ({
-        url: `users/${id}/activate`,
+      query: ({ id, active }: ToggleActive) => ({
+        url:    ApiUrls.USER_ACTIVATE(id),
         method: "PATCH",
-        body: { active },
+        body:   { active },
       }),
-      invalidatesTags: ["Users"],
+      invalidatesTags: [API_TAGS.USERS],
     }),
   }),
 });
 
+// Export auto-generated hooks for use in components
 export const {
   useGetStatsQuery,
   useGetResultsQuery,
@@ -85,4 +143,3 @@ export const {
   useDeleteUserMutation,
   useToggleUserActiveMutation,
 } = api;
-

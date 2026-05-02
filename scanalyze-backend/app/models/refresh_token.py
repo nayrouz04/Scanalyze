@@ -28,9 +28,7 @@ class RefreshToken(Base):
 
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Device / session context (optional but useful for "sign out all devices")
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)

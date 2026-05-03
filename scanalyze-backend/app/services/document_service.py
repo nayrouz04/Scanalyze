@@ -20,7 +20,13 @@ logger = logging.getLogger(__name__)
 #______constants __________
 ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpeg", ".jpg", ".tiff"}
 MAX_FILE_SIZE = 5 * 1024 * 1024 #5MB en bytes
-
+MAGIC_BYTES = {
+    ".pdf": [b"%PDF"],
+    ".png": [b"\x89PNG"],
+    ".jpeg": [b"\xff\xd8\xff"],
+    ".jpg": [b"\xff\xd8\xff"],
+    ".tiff": [b"II*\x00", b"MM\x00*"],
+}
 class DocumentError(Exception):
     """Domain-level document error — converted to HTTP response in the router."""
     def __init__(self, message: str, status_code: int = 400):
@@ -41,7 +47,11 @@ def get_s3_client():
 #_________ Validation _______________
 def validate_file(file: UploadFile, content: bytes) -> str:
     """ 
-    validate the file extension and size.
+    Validate the uploaded file:
+    1 Allowed extension
+    2 Non-empty file
+    3 Actual file content matches the extension (magic bytes)
+    4 Maximum size limit
     return the extension if valid, otherwise raise a DocumentError  
     """
     original_name = file.filename or ""
@@ -52,6 +62,22 @@ def validate_file(file: UploadFile, content: bytes) -> str:
             f"Unauthorized extension. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
+    if len(content) == 0:
+        raise DocumentError("File is empty")
+    
+    file_header = content[:8]
+    valid_signatures = MAGIC_BYTES.get(ext, [])
+    is_valid_content = any(
+        file_header.startswith(signature)
+        for signature in valid_signatures
+    )
+    
+    if not is_valid_content:
+        raise DocumentError(
+            f"The file content does not match the '{ext}' extension. "
+            f"The file appears to be corrupted or incorrectly renamed."
+        )
+        
     if len(content) > MAX_FILE_SIZE:
         raise DocumentError("File too large. Maximum size: 5 MB")
 

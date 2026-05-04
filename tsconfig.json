@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@features/*":   ["src/features/*"],
+      "@components/*": ["src/components/*"],
+      "@constants/*":  ["src/constants/*"],
+      "@app/*":        ["src/app/*"],
+      "@theme":        ["src/theme"],
+      "@theme/*":      ["src/theme/*"],
+      "@assets/*":     ["src/assets/*"],
+      "@services":     ["src/services"],    // ← ajouté
+      "@services/*":   ["src/services/*"],  // ← ajouté
+      "@hooks/*":      ["src/hooks/*"],     // ← ajouté
+    }
+  }
+}

@@ -108,7 +108,9 @@ class DocumentService:
         #__________3 Generate a unique MinIO filename _________
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         unique_filename = f"{uuid.uuid4().hex}_{timestamp}{ext}"
-        minio_path = f"uploads/{current_user.id}/{unique_filename}"
+        
+        date_folder = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        minio_path = f"uploads/{date_folder}/{unique_filename}"
         
         #________4 Upload to MinIO ____________
         try:

@@ -2,7 +2,7 @@
 app/api/v1/documents.py – Document endpoints
 
 POST /documents/upload    Upload a document (user only)
-GET /api/v1/documents/me → returns all of the user's documents
+GET /api/v1/documents/owned → returns all of the user's documents
 GET /api/v1/documents/ → view all documents of all users
 GET /api/v1/documents/{id} → view a specific document 
 DELETE /api/v1/documents/{id} → delete document
@@ -74,7 +74,7 @@ async def upload(
     
 #________ GET my documents (User) _____________
 @router.get(
-    "/me",
+    "/owned",
     response_model=list[DocumentResponse],
     summary="Get all my documents (user ONLY)",
 )

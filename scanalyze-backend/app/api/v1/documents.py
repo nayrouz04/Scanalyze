@@ -67,6 +67,7 @@ async def upload(
             file_type=document.file_type,
             file_size=document.file_size,
             status=document.status,
+            minio_path=document.minio_path,
             uploaded_at=document.uploaded_at,
         )
     except DocumentError as e:

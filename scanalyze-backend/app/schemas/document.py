@@ -16,6 +16,7 @@ class DocumentResponse(BaseModel):
     file_type: str
     file_size: int
     status: str # uploaded / processing / done
+    minio_path: str
     uploaded_at : datetime
     
     model_config = {"from_attributes": True}

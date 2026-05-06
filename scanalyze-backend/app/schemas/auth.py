@@ -164,3 +164,67 @@ class ResetPasswordRequest(BaseModel):
         if "new_password" in info.data and v != info.data["new_password"]:
             raise ValueError("Passwords do not match")
         return v
+    
+#________ Admin schemas ______________
+class AdminCreateUserRequest(BaseModel):
+    """Schema for creating a user by the admin"""
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(min_length=3, max_length=150)
+    office_address: str = Field(min_length=1, max_length=255)
+    phone_nbr: str | None = Field(default=None, pattern=r"^\+?[0-9\s\-]{7,20}$")
+    birth_date: date | None = Field(default=None)
+    
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        errors = []
+        if not any(c.isupper() for c in v):
+            errors.append("at least one uppercase letter")
+        if not any(c.islower() for c in v):
+            errors.append("at least one lowercase letter")
+        if not any(c.isdigit() for c in v):
+            errors.append("at least one digit")
+        if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v):
+            errors.append("at least one special character")
+        if errors:
+            raise ValueError(f"Password must contain: {', '.join(errors)}")
+        return v
+    
+    @field_validator("full_name")
+    @classmethod
+    def full_name_valid(cls, v: str) -> str:
+        if not all(c.isalpha() or c.isspace() for c in v):
+            raise ValueError("Full name must contain only letters and spaces")
+        return v.strip()
+    
+class UpdateUserRequest(BaseModel):
+    """Schema for updating a user by the admin"""
+    full_name: str | None = Field(default=None, min_length=3, max_length=150)
+    email: EmailStr | None = None
+    office_address: str | None = Field(default=None, min_length=1, max_length=255)
+    phone_nbr: str | None = Field(default=None, pattern=r"^\+?[0-9\s\-]{7,20}$")
+    is_active: bool | None = None
+    account_enabled: bool | None = None
+
+    @field_validator("full_name")
+    @classmethod
+    def full_name_valid(cls, v: str | None) -> str | None:
+        if v is not None and not all(c.isalpha() or c.isspace() for c in v):
+            raise ValueError("Full name must contain only letters and spaces")
+        return v.strip() if v else v
+    
+class UserListResponse(BaseModel):
+    """Schema for the list of users returned to the admin"""
+    id: uuid.UUID
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    is_verified: bool
+    account_enabled: bool
+    office_address: str
+    phone_nbr: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}    

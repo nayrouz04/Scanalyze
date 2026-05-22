@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Mapped = defines the Python type, mapped_column = creates a DB column, relationship = link between tables
 
 from app.db.session import Base
+from app.models.job import ExtractionJob
 
 
 class UserRole(str):
@@ -41,6 +42,9 @@ class User(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     account_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # Soft delete flag
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # Timestamp for when the account was soft-deleted
+    
     # Login tracking
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(
@@ -71,7 +75,10 @@ class User(Base):
         "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
     )
     documents: Mapped[list["Document"]] = relationship(
-        "Document", back_populates="user", cascade="all, delete-orphan"
+        "Document", back_populates="user", foreign_keys="[Document.user_id]"
+    )
+    jobs: Mapped[list["ExtractionJob"]] = relationship(
+        "ExtractionJob", back_populates="user"
     )
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"

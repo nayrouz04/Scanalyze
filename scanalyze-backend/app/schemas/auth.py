@@ -4,7 +4,7 @@ app/schemas/auth.py – Request / Response Pydantic schemas for auth endpoints
 import uuid
 from datetime import datetime , date
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 class RoleEnum(str, Enum):
     ADMIN = "admin"
@@ -111,15 +111,22 @@ class MessageResponse(BaseModel):
     message: str
 
 
-# ── Password change ───────────────────────────────────────────────────────────
+# ── Update profile ───────────────────────────────────────────────────────────
 
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str = Field(min_length=8, max_length=128)
+class UpdateProfileRequest(BaseModel):
+    """Schema for updating profile (user and admin)"""
+    email: EmailStr | None = None
+    phone_nbr: str | None = Field(default=None, pattern=r"^\+?[0-9\s\-]{7,20}$")
+    
+    # update pwd is optional
+    current_password: str | None = Field(default=None, min_length=8, max_length=128)
+    new_password: str | None = Field(default=None, min_length=8, max_length=128)
 
     @field_validator("new_password")
     @classmethod
-    def password_strength(cls, v: str) -> str:
+    def password_strength(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
         errors = []
         if not any(c.isupper() for c in v):
             errors.append("at least one uppercase letter")
@@ -132,6 +139,14 @@ class ChangePasswordRequest(BaseModel):
         if errors:
             raise ValueError(f"Password must contain: {', '.join(errors)}")
         return v
+
+    @model_validator(mode="after")
+    def check_passwords(self) -> "UpdateProfileRequest":
+        if self.new_password and not self.current_password:
+            raise ValueError("current_password is required to change password")
+        if self.current_password and not self.new_password:
+            raise ValueError("new_password is required when current_password is provided")
+        return self
     
 #___ pwd Reset ____________________
 class ForgotPasswordRequest(BaseModel):
@@ -227,4 +242,6 @@ class UserListResponse(BaseModel):
     phone_nbr: str | None
     created_at: datetime
 
-    model_config = {"from_attributes": True}    
+    model_config = {"from_attributes": True} 
+
+   

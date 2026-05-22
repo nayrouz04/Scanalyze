@@ -6,7 +6,7 @@ POST /auth/token          Login → access + refresh token
 POST /auth/refresh        Rotate access token using refresh token
 POST /auth/logout         Revoke refresh token
 POST /auth/logout-all     Revoke all refresh tokens (all devices)
-POST /auth/change-password Change password (authenticated)
+PATCH /auth/update-profile      Update current user profile (user and admin)
 GET  /auth/me             Get current user profile
 POST /auth/forgot-password          Send password reset email
 POST /auth/reset-password           Reset password using token
@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_db
 from app.schemas.auth import (
-    ChangePasswordRequest,
+    UpdateProfileRequest,
     ForgotPasswordRequest,
     LoginRequest,
     LogoutRequest,
@@ -205,35 +205,34 @@ async def logout_all(
     await service.logout_all(current_user.id)
     return MessageResponse(message="Logged out from all devices")
 
-
-# ── Change password ───────────────────────────────────────────────────────────
-
-@router.post(
-    "/change-password",
-    response_model=MessageResponse,
-    summary="Change password (invalidates all sessions)",
+#_____ Update profile ___________________
+@router.patch(
+    "/update-profile",
+    response_model=UserInfo,
+    summary="Update current user profile (user and admin)",
 )
-async def change_password(
-    data: ChangePasswordRequest,
+async def update_profile(
+    data: UpdateProfileRequest,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Change password. Requires current password verification.
-    All refresh tokens are revoked — user must re-login on all devices.
+    Update profile for user and admin :
+    - email → optional
+    - phone_nbr → optional
+    - new_password → requires current_password
     """
     try:
         service = AuthService(db)
-        await service.change_password(
+        user = await service.update_profile(
             user=current_user,
-            current_password=data.current_password,
-            new_password=data.new_password,
+            data=data,
         )
+        await db.commit()
+        return UserInfo.model_validate(user)
     except AuthError as e:
+        await db.rollback()
         raise _auth_error_to_http(e)
-
-    return MessageResponse(message="Password changed. Please log in again.")
-
 
 # ── Me ────────────────────────────────────────────────────────────────────────
 

@@ -6,7 +6,10 @@ from alembic import context
 
 from app.config import get_settings
 from app.db.session import Base
-from app.models import User, RefreshToken, PasswordResetToken, EmailVerificationToken
+from app.models import User, RefreshToken, PasswordResetToken, EmailVerificationToken, DocumentType
+from app.models.document import Document
+from app.models.job import ExtractionJob
+from app.models.result import ExtractedField, Result
 
 # Alembic Config object
 config = context.config

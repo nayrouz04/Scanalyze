@@ -22,7 +22,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.reset_token import PasswordResetToken
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.user import User
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import RegisterRequest, UpdateProfileRequest
 from app.services.email import (
     send_reset_password_email,
     send_admin_new_user_notification,
@@ -133,6 +133,9 @@ class AuthService:
             # Constant-time fake verify to prevent user enumeration via timing
             hash_password("fake-constant-time-check")
             raise AuthError("Invalid credentials", 401)
+        
+        if user.is_deleted:
+            raise AuthError("This account has been deleted", 403)
 
         if not user.is_active:
             raise AuthError("Account is disabled", 403)
@@ -232,20 +235,6 @@ class AuthService:
         )
         for token in result.scalars().all():
             token.is_revoked = True
-        await self.db.flush()
-
-    # ── Change password ───────────────────────────────────────────────────────
-
-    async def change_password(
-        self, user: User, current_password: str, new_password: str
-    ) -> None:
-        if not verify_password(current_password, user.hashed_password):
-            raise AuthError("Current password is incorrect", 400)
-
-        user.hashed_password = hash_password(new_password)
-
-        # Revoke all refresh tokens — force re-login on all devices
-        await self.logout_all(user.id)
         await self.db.flush()
     
     #_____ Forgot PWD _____________________
@@ -379,3 +368,44 @@ class AuthService:
         )
         self.db.add(stored)
         return raw_token
+    
+    async def update_profile(
+        self, 
+        user:User,
+        data: UpdateProfileRequest,
+    ) -> User:
+        """
+        Update user or admin profile
+        - email, phone_nbr → optional
+        - new_password → requires current_password
+        """
+        #update email
+        if data.email is not None:
+        # verify if the new email is not already taken by another user
+            existing = await self.db.execute(
+                select(User).where(User.email == data.email.lower())
+            )
+            if existing.scalar_one_or_none():
+                raise AuthError("Email already registered", 409)
+            user.email = data.email.lower()
+        #update phone number
+        if data.phone_nbr is not None:
+            user.phone_nbr = data.phone_nbr
+        
+        #change password 
+        if data.new_password is not None:
+            #verify the old password 
+            if not verify_password(data.current_password, user.hashed_password):
+                raise AuthError("Current password is incorrect", 400)
+            #update password
+            user.hashed_password = hash_password(data.new_password)
+            #revoke all refresh tokens — force re-login on all devices
+            await self.logout_all(user.id)
+        
+        await self.db.flush()
+        logger.info("Profile updated for: %s", user.email)
+        return user
+    
+    
+    
+    

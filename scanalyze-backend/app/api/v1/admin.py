@@ -9,6 +9,7 @@ POST /admin/users/{id}/enable  - approve a user account
 POST /admin/users/{id}/disable - disable a user account
 DELETE /admin/users/{id}       - permanently delete a user
 PATCH  /admin/users/{id}       - update a user's information
+GET    /admin/dashboard        - get dashboard statistics
 """
 
 import logging
@@ -26,6 +27,7 @@ from app.schemas.auth import (MessageResponse,
                             RegisterResponse,
 )                           
 from app.services.admin_service import AdminError, AdminService
+from app.schemas.dashboard import DashboardStats
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -200,3 +202,29 @@ async def update_user(
         raise _admin_error_to_http(e)
 
     return UserListResponse.model_validate(user)
+
+#________ Get dashboard stats __________
+@router.get(
+    "/dashboard",
+    response_model=DashboardStats,
+    summary="Get statistics for the admin dashboard(admin only)",
+)
+async def get_dashboard_stats(
+   current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """ 
+    Returns dashboard statistics calculated from the entire database :
+    - documents_processed    → total number of uploaded documents
+    - extraction_success_rate → % of documents with confidence >= 50%
+    - low_confidence_documents → number of documents with confidence < 50%
+    - most_processed_doc_type → most frequent document type
+    """ 
+    try:
+        _require_admin(current_user)
+        service = AdminService(db)
+        stats = await service.get_dashboard_stats()
+    except AdminError as e:
+        raise _admin_error_to_http(e)
+    
+    return stats

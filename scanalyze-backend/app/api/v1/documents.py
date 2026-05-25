@@ -66,6 +66,7 @@ async def upload(
             original_filename=document.original_filename,
             file_type=document.file_type,
             file_size=document.file_size,
+            doc_type_id=document.doc_type_id,
             status=document.status,
             minio_path=document.minio_path,
             uploaded_at=document.uploaded_at,
@@ -94,7 +95,9 @@ async def get_my_documents(
                 original_filename=doc.original_filename,
                 file_type=doc.file_type,
                 file_size=doc.file_size,
+                doc_type_id=doc.doc_type_id,
                 status=doc.status,
+                minio_path=doc.minio_path,
                 uploaded_at=doc.uploaded_at,
             )
             for doc in documents    
@@ -124,7 +127,9 @@ async def get_all_documents(
                 original_filename=doc.original_filename,
                 file_type=doc.file_type,
                 file_size=doc.file_size,
+                doc_type_id=doc.doc_type_id,
                 status=doc.status,
+                minio_path=doc.minio_path,
                 uploaded_at=doc.uploaded_at,
             )
             for doc in documents
@@ -153,7 +158,9 @@ async def get_document_by_id(
             original_filename=doc.original_filename,
             file_type=doc.file_type,
             file_size=doc.file_size,
+            doc_type_id=doc.doc_type_id,
             status=doc.status,
+            minio_path=doc.minio_path,
             uploaded_at=doc.uploaded_at,
         )
     except DocumentError as e:

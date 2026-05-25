@@ -1,10 +1,11 @@
 """
 app/services/admin_service.py – Admin business logic
 """
+from datetime import datetime, timezone
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
@@ -15,6 +16,8 @@ from app.services.email import (
     send_account_approved_email,
     send_account_rejected_email,
 )
+from app.models.document import Document
+from app.schemas.dashboard import DashboardStats
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,10 @@ class AdminService:
     async def get_pending_users(self) -> list[User]:
         """Return all users waiting for admin approval"""
         result = await self.db.execute(
-            select(User).where(User.account_enabled == False)
+            select(User).where(
+                User.account_enabled == False,
+                User.is_deleted == False
+            )
         )
         return result.scalars().all()
     
@@ -94,9 +100,10 @@ class AdminService:
     #________ Get all users __________
     
     async def get_all_users(self) -> list[User]:
-        """Return all the users and admins"""
-        result = await self.db.execute(select(User))
+        """Return all active users and admins (not deleted)"""
+        result = await self.db.execute(select(User).where(User.is_deleted == False))
         return result.scalars().all()
+    
     #_____ Create user _______________
     async def create_user(self, data: AdminCreateUserRequest) -> User:
         """Creates a user directly activated by the admin"""
@@ -129,7 +136,9 @@ class AdminService:
         return user
     #_______ Delete user _____________
     async def delete_user(self, user_id: uuid.UUID) -> User:
-        """Permanently deletes a user (not an admin)"""
+        """
+        Soft delete of a user (not an admin), marked as deleted without being removed from the DB
+        """
         
         result = await self.db.execute(
             select(User).where(User.id == user_id)
@@ -144,7 +153,13 @@ class AdminService:
         if user.role == "admin":   
             raise AdminError("Cannot delete an admin account", 403)
         
-        await self.db.delete(user)
+        #verify if user is already deleted
+        if user.is_deleted:
+            raise AdminError("User is already deleted", 400)
+        
+        user.is_deleted = True
+        user.deleted_at = datetime.now(timezone.utc)
+        
         await self.db.flush()
         
         logger.info("User deleted by admin: %s", user.email)
@@ -188,3 +203,83 @@ class AdminService:
         
         logger.info("User updated by admin: %s", user.email)
         return user
+    
+    #__________ Get dashboard stats ____________
+    async def get_dashboard_stats(self) -> DashboardStats:
+        """
+        Calculate and return dashboard statistics from the entire database
+        """
+        #______ documents processed _________
+        docs_result = await self.db.execute(
+            select(func.count(Document.id)).where(
+                Document.is_deleted == False
+            )
+        )
+        documents_processed = docs_result.scalar() or 0
+        
+        #______ extraction success rate _________
+        processed_docs_result = await self.db.execute(
+            select(func.count(Document.id)).where(
+                Document.is_deleted == False,
+                Document.confidence_score .isnot(None)
+            )
+        )
+        processed_docs_count = processed_docs_result.scalar() or 0
+        
+        if processed_docs_count > 0:
+            #Count documents with confidence_score >= 0.50
+            success_docs_result = await self.db.execute(
+                select(func.count(Document.id)).where(
+                    Document.is_deleted == False,
+                    Document.confidence_score >= 0.50,
+                    Document.confidence_score.isnot(None)
+                )
+            )
+            success_docs_count = success_docs_result.scalar() or 0
+
+            # Calculate percentage
+            extraction_success_rate = round(
+                (success_docs_count / processed_docs_count) * 100, 2
+            )
+        else:
+            extraction_success_rate = 0.0
+        
+        #______ low confidence documents _________
+        #Number of documents with confidence_score < 0.50
+        low_conf_result = await self.db.execute(
+            select(func.count(Document.id)).where(
+                Document.is_deleted == False,
+                Document.confidence_score < 0.50,
+                Document.confidence_score.isnot(None)
+            )
+        )
+        low_confidence_documents = low_conf_result.scalar() or 0
+        
+        #______ most processed document type _________
+        #Most frequent doc_type detected by the pipeline
+        doc_type_result = await self.db.execute(
+        select(Document.doc_type, func.count(Document.id).label("count"))
+            .where(
+                Document.is_deleted == False,    
+                Document.doc_type.isnot(None)    # only documents with detected type
+            ).group_by(Document.doc_type)
+            # group by doc_type → count per type
+            .order_by(func.count(Document.id).desc())
+            # order by count descending → most frequent first
+            .limit(1)
+            # take only the first → most frequent
+        )
+        doc_type_row = doc_type_result.first()
+        most_processed_doc_type = doc_type_row[0] if doc_type_row else None
+        # doc_type_row[0] → the doc_type value
+        
+        logger.info("Dashboard stats calculated successfully")
+        
+        return DashboardStats(
+            documents_processed=documents_processed,
+            extraction_success_rate=extraction_success_rate,
+            low_confidence_documents=low_confidence_documents,
+            most_processed_doc_type=most_processed_doc_type
+        )
+        
+        

@@ -1,0 +1,14 @@
+[
+  { "id": "DOC-001", "name": "facture_mars_2024.pdf",      "type": "invoices", "date": "2024-03-15", "size": "245 KB", "status": "uploaded",   "pages": 2 },
+  { "id": "DOC-002", "name": "cv_ahmed_benali.pdf",         "type": "cv",       "date": "2024-03-14", "size": "182 KB", "status": "processing", "pages": 1 },
+  { "id": "DOC-003", "name": "contrat_prestation.pdf",      "type": "contrat",  "date": "2024-03-13", "size": "512 KB", "status": "uploaded",   "pages": 5 },
+  { "id": "DOC-004", "name": "facture_fournisseur.jpg",     "type": "invoices", "date": "2024-03-12", "size": "98 KB",  "status": "failed",     "pages": 1 },
+  { "id": "DOC-005", "name": "scan_identite.png",           "type": "others",   "date": "2024-03-12", "size": "310 KB", "status": "uploaded",   "pages": 1 },
+  { "id": "DOC-006", "name": "cv_sarah_khelil.pdf",         "type": "cv",       "date": "2024-03-11", "size": "204 KB", "status": "uploaded",   "pages": 2 },
+  { "id": "DOC-007", "name": "contrat_bail_2024.pdf",       "type": "contrat",  "date": "2024-03-10", "size": "720 KB", "status": "processing", "pages": 8 },
+  { "id": "DOC-008", "name": "facture_telecom.pdf",         "type": "invoices", "date": "2024-03-09", "size": "135 KB", "status": "failed",     "pages": 1 },
+  { "id": "DOC-009", "name": "rapport_annuel.pdf",          "type": "others",   "date": "2024-03-08", "size": "1.2 MB", "status": "uploaded",   "pages": 24 },
+  { "id": "DOC-010", "name": "facture_avril_2024.pdf",      "type": "invoices", "date": "2024-03-07", "size": "198 KB", "status": "uploaded",   "pages": 2 },
+  { "id": "DOC-011", "name": "cv_karim_mansouri.pdf",       "type": "cv",       "date": "2024-03-06", "size": "167 KB", "status": "uploaded",   "pages": 1 },
+  { "id": "DOC-012", "name": "contrat_travail.pdf",         "type": "contrat",  "date": "2024-03-05", "size": "430 KB", "status": "processing", "pages": 4 }
+]

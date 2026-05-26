@@ -1,0 +1,10 @@
+{
+  "totalDocs": "24.1k",
+  "totalDocsTrend": "+12% this month",
+  "successRate": "94.3%",
+  "successRateTrend": "+2.1% vs last month",
+  "failureRate": "5.7%",
+  "failureRateTrend": "-1.4% vs last month",
+  "avgProcTime": "1.8s",
+  "avgProcTimeTrend": "-0.3s faster"
+}

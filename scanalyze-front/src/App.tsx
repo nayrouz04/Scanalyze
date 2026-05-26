@@ -11,6 +11,9 @@ import { StepperProvider } from "./features/stepper/StepperContext";
  *   - AppRouter      : renders all route definitions
  */
 export default function App() {
+ const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL as string;
+  console.log('API_BASE_URL:', API_BASE_URL);
   return (
     <BrowserRouter>
       <StepperProvider>

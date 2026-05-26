@@ -17,8 +17,7 @@ import {
   tableHeadCellSx, tableCellSx,
   btnPrimarySx, btnDangerSx,
 } from "@theme";
-
-// User — shape of a single user record
+ 
 interface User {
   id:       string;
   fullName: string;
@@ -26,8 +25,7 @@ interface User {
   role:     "admin" | "user";
   active:   boolean;
 }
-
-// TODO: replace with RTK Query API call when backend user endpoints are ready
+ 
 const MOCK_USERS: User[] = [
   { id: "1", fullName: "Julianne Devis",    email: "j.devis@scanalyze.io",      role: "admin", active: true  },
   { id: "2", fullName: "Marcus Knight",     email: "m.knight@scanalyze.io",     role: "user",  active: true  },
@@ -36,23 +34,28 @@ const MOCK_USERS: User[] = [
   { id: "5", fullName: "Nina Patel",        email: "n.patel@scanalyze.io",      role: "user",  active: false },
   { id: "6", fullName: "Tom Erikson",       email: "t.erikson@scanalyze.io",    role: "user",  active: true  },
 ];
-
+ 
 const ROWS_PER_PAGE = 4;
-
-// Empty form state — reused to reset after submit or cancel
+ 
 const emptyForm = { fullName: "", email: "", role: "user" as "admin" | "user", password: "" };
-
-// Returns up to 2 uppercase initials from a full name (e.g. "John Doe" → "JD")
+ 
+const AVATAR_PALETTE = [
+  colors.blueButton, "#0f766e", "#7c3aed", "#b45309", "#be185d", "#065f46",
+];
+ 
+const switchCheckedSx = {
+  "& .MuiSwitch-switchBase.Mui-checked":                   { color: colors.green },
+  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#166534" },
+} as const;
+ 
 function getInitials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
-
-// Returns a consistent avatar background color based on the first character of the name
+ 
 function getAvatarColor(name: string) {
-  const palette = [colors.blueButton, "#0f766e", "#7c3aed", "#b45309", "#be185d", "#065f46"];
-  return palette[name.charCodeAt(0) % palette.length];
+  return AVATAR_PALETTE[name.charCodeAt(0) % AVATAR_PALETTE.length];
 }
-
+ 
 export default function UserManagement() {
   const [users,        setUsers]        = useState<User[]>(MOCK_USERS);
   const [search,       setSearch]       = useState<string>("");
@@ -63,22 +66,20 @@ export default function UserManagement() {
   const [deleteOpen,   setDeleteOpen]   = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [form,         setForm]         = useState(emptyForm);
-
-  // Filter by search text (name or email) and selected role
+  const [editActive,   setEditActive]   = useState<boolean>(false);
+ 
   const filtered = users.filter((u) => {
     const matchSearch = u.fullName.toLowerCase().includes(search.toLowerCase())
                      || u.email.toLowerCase().includes(search.toLowerCase());
     const matchRole   = roleFilter === "all" || u.role === roleFilter;
     return matchSearch && matchRole;
   });
-
+ 
   const totalPages = Math.ceil(filtered.length / ROWS_PER_PAGE);
   const paginated  = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
-
-  // Admin users are read-only — their actions are blocked
+ 
   const isRestricted = (user: User) => user.role === "admin";
-
-  // Prepend the new user to the list with active=false (pending activation)
+ 
   const handleCreate = () => {
     setUsers((prev) => [
       { id: String(Date.now()), fullName: form.fullName, email: form.email, role: form.role, active: false },
@@ -87,53 +88,48 @@ export default function UserManagement() {
     setCreateOpen(false);
     setForm(emptyForm);
   };
-
-  // Update only the selected user's editable fields
+ 
   const handleEdit = () => {
     if (!selectedUser) return;
     setUsers((prev) =>
       prev.map((u) =>
         u.id === selectedUser.id
-          ? { ...u, fullName: form.fullName, email: form.email, role: form.role }
+          ? { ...u, fullName: form.fullName, email: form.email, active: editActive }
           : u,
       ),
     );
     setEditOpen(false);
     setSelectedUser(null);
   };
-
-  // Remove the selected user from the list
+ 
   const handleDelete = () => {
     if (!selectedUser) return;
     setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
     setDeleteOpen(false);
     setSelectedUser(null);
   };
-
-  // Toggle active status — blocked for admin users
+ 
   const handleToggleActive = (user: User) => {
     if (isRestricted(user)) return;
     setUsers((prev) =>
       prev.map((u) => u.id === user.id ? { ...u, active: !u.active } : u),
     );
   };
-
-  // Open edit dialog pre-filled with the selected user's data
+ 
   const openEdit = (user: User) => {
     setSelectedUser(user);
     setForm({ fullName: user.fullName, email: user.email, role: user.role, password: "" });
+    setEditActive(user.active);
     setEditOpen(true);
   };
-
-  // Open delete confirmation dialog for the selected user
+ 
   const openDelete = (user: User) => {
     setSelectedUser(user);
     setDeleteOpen(true);
   };
-
-  // Shared form fields reused in both Create and Edit dialogs
-  // Password field is hidden in edit mode (editOpen=true)
-  const FormFields = () => (
+ 
+  // ── Formulaire Create ─────────────────────────────────────────────────────
+  const CreateFormFields = () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
       <TextField
         label="Full Name" fullWidth value={form.fullName}
@@ -154,19 +150,52 @@ export default function UserManagement() {
           <MenuItem value="user">User</MenuItem>
         </Select>
       </FormControl>
-      {/* Password only in Create mode */}
-      {!editOpen && (
-        <TextField
-          label="Password" type="password" fullWidth value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })} sx={inputSx}
-        />
-      )}
+      <TextField
+        label="Password" type="password" fullWidth value={form.password}
+        onChange={(e) => setForm({ ...form, password: e.target.value })} sx={inputSx}
+      />
     </Box>
   );
-
+ 
+  // ── Formulaire Edit ───────────────────────────────────────────────────────
+  const EditFormFields = () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+      <TextField
+        label="Full Name" fullWidth value={form.fullName}
+        onChange={(e) => setForm({ ...form, fullName: e.target.value })} sx={inputSx}
+      />
+      <TextField
+        label="Email" fullWidth value={form.email}
+        onChange={(e) => setForm({ ...form, email: e.target.value })} sx={inputSx}
+      />
+      <Box
+        sx={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          px: 2, py: 1.5, borderRadius: 1.5,
+          border: `1px solid ${colors.borderCard}`,
+          bgcolor: colors.bgDark,
+        }}
+      >
+        <Box>
+          <Typography variant="body2" color={colors.textWhite} fontWeight={600}>
+            Compte actif
+          </Typography>
+          <Typography variant="caption" color={colors.textMuted}>
+            {editActive ? "L'utilisateur peut se connecter" : "Accès désactivé"}
+          </Typography>
+        </Box>
+        <Switch
+          checked={editActive}
+          onChange={(e) => setEditActive(e.target.checked)}
+          sx={switchCheckedSx}
+        />
+      </Box>
+    </Box>
+  );
+ 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-
+ 
       {/* ── Page header ── */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
@@ -178,11 +207,10 @@ export default function UserManagement() {
           Create User
         </Button>
       </Box>
-
+ 
       {/* ── Table card ── */}
       <Box sx={{ bgcolor: colors.bgCard, borderRadius: 2, border: `1px solid ${colors.borderCard}`, p: 2 }}>
-
-        {/* Search + role filter */}
+ 
         <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
           <TextField
             placeholder="Search by name, email..." value={search} size="small"
@@ -207,8 +235,7 @@ export default function UserManagement() {
             </Select>
           </FormControl>
         </Box>
-
-        {/* ── Users table ── */}
+ 
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -224,10 +251,8 @@ export default function UserManagement() {
               return (
                 <TableRow key={user.id} sx={{
                   "&:hover": { bgcolor: colors.bgDark },
-                  // Dim admin rows visually to indicate they are read-only
                   opacity: restricted ? 0.75 : 1,
                 }}>
-                  {/* Avatar + name + email */}
                   <TableCell sx={tableCellSx}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                       <Avatar sx={{
@@ -243,8 +268,7 @@ export default function UserManagement() {
                       </Box>
                     </Box>
                   </TableCell>
-
-                  {/* Role chip */}
+ 
                   <TableCell sx={tableCellSx}>
                     <Chip
                       label={user.role.toUpperCase()} size="small" variant="outlined"
@@ -255,8 +279,7 @@ export default function UserManagement() {
                       }}
                     />
                   </TableCell>
-
-                  {/* Active toggle — locked for admin users */}
+ 
                   <TableCell sx={tableCellSx}>
                     <Tooltip title={restricted ? "Cannot change admin status" : user.active ? "Désactiver" : "Activer"}>
                       <span>
@@ -264,16 +287,12 @@ export default function UserManagement() {
                           checked={user.active} size="small"
                           onChange={() => handleToggleActive(user)}
                           disabled={restricted}
-                          sx={{
-                            "& .MuiSwitch-switchBase.Mui-checked": { color: colors.green },
-                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#166534" },
-                          }}
+                          sx={switchCheckedSx}
                         />
                       </span>
                     </Tooltip>
                   </TableCell>
-
-                  {/* Action buttons — replaced by a lock icon for admin rows */}
+ 
                   <TableCell sx={{ ...tableCellSx, textAlign: "right" }}>
                     {restricted ? (
                       <Tooltip title="Admins cannot manage other admins">
@@ -303,8 +322,7 @@ export default function UserManagement() {
             })}
           </TableBody>
         </Table>
-
-        {/* Pagination + record count */}
+ 
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2, flexWrap: "wrap", gap: 1 }}>
           <Typography variant="caption" color={colors.textMuted}>
             Showing {Math.min((page - 1) * ROWS_PER_PAGE + 1, filtered.length)} to{" "}
@@ -315,11 +333,11 @@ export default function UserManagement() {
           )}
         </Box>
       </Box>
-
+ 
       {/* ── Create User Dialog ── */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)}>
         <DialogTitle sx={{ color: colors.textWhite }}>Create User</DialogTitle>
-        <DialogContent><FormFields /></DialogContent>
+        <DialogContent><CreateFormFields /></DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setCreateOpen(false)} sx={{ color: colors.textMuted }}>Cancel</Button>
           <Button variant="contained" onClick={handleCreate}
@@ -328,11 +346,11 @@ export default function UserManagement() {
           </Button>
         </DialogActions>
       </Dialog>
-
+ 
       {/* ── Edit User Dialog ── */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)}>
         <DialogTitle sx={{ color: colors.textWhite }}>Edit User</DialogTitle>
-        <DialogContent><FormFields /></DialogContent>
+        <DialogContent><EditFormFields /></DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setEditOpen(false)} sx={{ color: colors.textMuted }}>Cancel</Button>
           <Button variant="contained" onClick={handleEdit}
@@ -341,7 +359,7 @@ export default function UserManagement() {
           </Button>
         </DialogActions>
       </Dialog>
-
+ 
       {/* ── Delete Confirmation Dialog ── */}
       <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)}>
         <DialogTitle sx={{ color: colors.textWhite }}>Confirm Delete</DialogTitle>

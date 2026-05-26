@@ -1,0 +1,53 @@
+[
+    {
+        "message": "",
+        "id": "fb628089-f0e6-4ff6-a9cb-23232fb49f71",
+        "filename": "946a7f2be03b4dc4a6703558d79965fd_20260501_230214.jpg",
+        "original_filename": "cv1.jpg",
+        "file_type": "jpg",
+        "file_size": 231256,
+        "status": "uploaded",
+        "uploaded_at": "2026-05-01T23:02:14.602022Z"
+    },
+    {
+        "message": "",
+        "id": "60ad6cdc-a11c-4ce7-a5a9-4c877a0a1069",
+        "filename": "1d558b66a2fc44969c8c8a7e55fa6667_20260501_231525.jpg",
+        "original_filename": "cv1.jpg",
+        "file_type": "jpg",
+        "file_size": 231256,
+        "status": "uploaded",
+        "uploaded_at": "2026-05-01T23:15:25.133428Z"
+    },
+    {
+        "message": "",
+        "id": "fac0d42d-a80d-43c5-aa42-0e94ebc35831",
+        "filename": "5c32acb905704a4f9b9aba6ddf10ec44_20260501_231525.jpg",
+        "original_filename": "cv1.jpg",
+        "file_type": "jpg",
+        "file_size": 231256,
+        "status": "uploaded",
+        "uploaded_at": "2026-05-01T23:15:25.287817Z"
+    },
+    {
+        "message": "",
+        "id": "4e22ddc5-e4d5-47af-a311-8cd0e6720222",
+        "filename": "fe5c2070aa4546eda069e5ef831c1adf_20260501_231525.jpg",
+        "original_filename": "cv1.jpg",
+        "file_type": "jpg",
+        "file_size": 231256,
+        "status": "uploaded",
+        "uploaded_at": "2026-05-01T23:15:25.421377Z"
+    },
+    {
+        "message": "",
+        "id": "e9077bdc-83c4-4fd6-8a96-c6e3024f6d7f",
+        "filename": "b0ddf057e94a4bebb58e8bf1a9ff2e30_20260501_231541.jpg",
+        "original_filename": "cv1.jpg",
+        "file_type": "jpg",
+        "file_size": 231256,
+        "status": "uploaded",
+        "uploaded_at": "2026-05-01T23:15:41.764402Z"
+    }
+]
+ 

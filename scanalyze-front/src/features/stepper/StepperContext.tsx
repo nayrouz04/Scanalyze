@@ -1,4 +1,4 @@
-// StepperContext.tsx â€” React context and provider for the document pipeline stepper
+// StepperContext.tsx — React context and provider for the document pipeline stepper
 // Manages which step is active and which steps have been completed
 import { createContext, useState, type ReactNode } from "react";
 import { STEPS, type StepId } from "@constants";
@@ -7,26 +7,20 @@ import { STEPS, type StepId } from "@constants";
 export type { StepId };
 export { STEPS };
 
-// StepperCtx â€” shape of the context value exposed to consumers
+// StepperCtx — shape of the context value exposed to consumers
 export interface StepperCtx {
-  // Index of the currently active step
   activeStep:     number;
-  // Set of step indices that have been completed
   completedSteps: Set<number>;
-  // Returns true if step i is unlocked (step 0 is always accessible)
   canAccessStep:  (i: number) => boolean;
-  // Marks step i as complete and advances to the next step
   completeStep:   (i: number) => void;
-  // Navigates to step i if it is accessible
   goToStep:       (i: number) => void;
-  // Resets the stepper back to its initial state
   resetStepper:   () => void;
 }
 
-// Internal context â€” null when accessed outside the provider
+// Internal context — null when accessed outside the provider
 export const StepperContext = createContext<StepperCtx | null>(null);
 
-// StepperProvider â€” wraps the app (or a subtree) to provide stepper state
+// StepperProvider — wraps the app to provide stepper state
 export const StepperProvider = ({ children }: { children: ReactNode }) => {
   const [activeStep,     setActiveStep] = useState<number>(0);
   const [completedSteps, setCompleted ] = useState<Set<number>>(new Set<number>());
@@ -45,7 +39,7 @@ export const StepperProvider = ({ children }: { children: ReactNode }) => {
     if (canAccessStep(i)) setActiveStep(i);
   };
 
-  // Reset everything back to the first step with no completed steps
+  // Reset everything back to the first step
   const resetStepper = (): void => {
     setActiveStep(0);
     setCompleted(new Set<number>());

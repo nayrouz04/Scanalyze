@@ -1,0 +1,23 @@
+[
+  {
+    "id": "RES-001",
+    "original_filename": "cv_emilie_michaud.png",
+    "file_url": "cv_emilie_michaud",
+    "doc_type": "cv",
+    "confidence": 0.94,
+    "extracted_data": {
+      "nom":             { "value": "Michaud",                "bbox": { "x": 0.45, "y": 0.08, "w": 0.30, "h": 0.04 } },
+      "prenom":          { "value": "Emilie",                 "bbox": { "x": 0.45, "y": 0.05, "w": 0.25, "h": 0.04 } },
+      "poste":           { "value": "Stage / Job Étudiant",   "bbox": { "x": 0.45, "y": 0.12, "w": 0.40, "h": 0.03 } },
+      "telephone":       { "value": "06 06 06 06 06",         "bbox": { "x": 0.05, "y": 0.36, "w": 0.30, "h": 0.03 } },
+      "email":           { "value": "michaud.emilie@gmail.com","bbox": { "x": 0.05, "y": 0.40, "w": 0.35, "h": 0.03 } },
+      "adresse":         { "value": "Paris (75) France",      "bbox": { "x": 0.05, "y": 0.44, "w": 0.28, "h": 0.03 } },
+      "formation_1":     { "value": "Licence LEA Anglais / Italien — Université Paris (75) 2019–2022", "bbox": { "x": 0.45, "y": 0.30, "w": 0.50, "h": 0.04 } },
+      "formation_2":     { "value": "Baccalauréat Littéraire — Lycée Aristide Briand 2019",            "bbox": { "x": 0.45, "y": 0.42, "w": 0.50, "h": 0.04 } },
+      "experience_1":    { "value": "Traductrice Stagiaire — Traduc'entreprise Paris, juillet 2022",   "bbox": { "x": 0.45, "y": 0.55, "w": 0.50, "h": 0.04 } },
+      "experience_2":    { "value": "Assistante de Direction Stagiaire — EDF Paris, février 2014",     "bbox": { "x": 0.45, "y": 0.63, "w": 0.50, "h": 0.04 } },
+      "langues":         { "value": "Français, Anglais, Italien",  "bbox": null },
+      "competences":     { "value": "Sens du relationnel, Travail en équipe, Créativité, Photoshop",   "bbox": null }
+    }
+  }
+]

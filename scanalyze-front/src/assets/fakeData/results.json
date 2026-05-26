@@ -1,0 +1,86 @@
+[
+  {
+    "id": "RES-001",
+    "source_document": "facture_mars_2024.pdf",
+    "json_filename": "facture_mars_2024_result.json",
+    "doc_type": "invoices",
+    "processed_at": "2024-03-15T10:32:45Z",
+    "processing_time_ms": 3240,
+    "confidence": 0.97,
+    "fields_extracted": 12,
+    "language": "fr",
+    "size": "8.4 KB"
+  },
+  {
+    "id": "RES-002",
+    "source_document": "cv_ahmed_benali.pdf",
+    "json_filename": "cv_ahmed_benali_result.json",
+    "doc_type": "cv",
+    "processed_at": "2024-03-14T14:17:22Z",
+    "processing_time_ms": 2850,
+    "confidence": 0.94,
+    "fields_extracted": 9,
+    "language": "fr",
+    "size": "6.1 KB"
+  },
+  {
+    "id": "RES-003",
+    "source_document": "contrat_prestation.pdf",
+    "json_filename": "contrat_prestation_result.json",
+    "doc_type": "contrat",
+    "processed_at": "2024-03-13T09:05:11Z",
+    "processing_time_ms": 7120,
+    "confidence": 0.89,
+    "fields_extracted": 18,
+    "language": "fr",
+    "size": "14.2 KB"
+  },
+  {
+    "id": "RES-004",
+    "source_document": "cv_sarah_khelil.pdf",
+    "json_filename": "cv_sarah_khelil_result.json",
+    "doc_type": "cv",
+    "processed_at": "2024-03-11T16:44:03Z",
+    "processing_time_ms": 2310,
+    "confidence": 0.96,
+    "fields_extracted": 11,
+    "language": "fr",
+    "size": "7.8 KB"
+  },
+  {
+    "id": "RES-005",
+    "source_document": "rapport_annuel.pdf",
+    "json_filename": "rapport_annuel_result.json",
+    "doc_type": "others",
+    "processed_at": "2024-03-08T11:22:34Z",
+    "processing_time_ms": 18540,
+    "confidence": 0.91,
+    "fields_extracted": 42,
+    "language": "fr",
+    "size": "38.7 KB"
+  },
+  {
+    "id": "RES-006",
+    "source_document": "facture_avril_2024.pdf",
+    "json_filename": "facture_avril_2024_result.json",
+    "doc_type": "invoices",
+    "processed_at": "2024-03-07T08:59:17Z",
+    "processing_time_ms": 2980,
+    "confidence": 0.98,
+    "fields_extracted": 13,
+    "language": "fr",
+    "size": "9.0 KB"
+  },
+  {
+    "id": "RES-007",
+    "source_document": "cv_karim_mansouri.pdf",
+    "json_filename": "cv_karim_mansouri_result.json",
+    "doc_type": "cv",
+    "processed_at": "2024-03-06T15:30:08Z",
+    "processing_time_ms": 2150,
+    "confidence": 0.93,
+    "fields_extracted": 8,
+    "language": "ar",
+    "size": "5.9 KB"
+  }
+]

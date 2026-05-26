@@ -1,0 +1,51 @@
+{
+  "id": "DOC-002",
+  "document_id": "DOC-002",
+  "validation_status": "pending",
+  "extracted_data": {
+    "type": "CV",
+    "nom": "Michaud",
+    "prenom": "Emilie",
+    "email": "michaud.emilie@gmail.com",
+    "telephone": "06 06 06 06 06",
+    "adresse": "Paris (75) France",
+    "poste_recherche": "Stage / Job Étudiant",
+    "profil": "Étudiante en 3ème année de Licence, passionnée de langues étrangères et dotée d'un bon sens relationnel. Recherche un emploi étudiant en tant qu'hôtesse d'accueil dans un hôtel.",
+    "langues": ["Français", "Anglais", "Italien"],
+    "competences": ["Sens du relationnel", "Travail en équipe", "Créativité", "Ouverture d'esprit", "Ponctualité", "Photoshop", "Montage vidéo"],
+    "formation": [
+      {
+        "diplome": "Licence LEA Anglais / Italien",
+        "etablissement": "Université, Paris (75)",
+        "periode": "2019 – 2022",
+        "mentions": ["Civilisation", "Droit", "Économie", "Traduction"]
+      },
+      {
+        "diplome": "Baccalauréat Littéraire",
+        "etablissement": "Lycée Aristide Briand, Paris (75)",
+        "periode": "2019",
+        "mentions": ["Mention Bien", "Option art du spectacle", "Classe européenne", "UNSS badminton"]
+      }
+    ],
+    "experiences": [
+      {
+        "poste": "Traductrice Stagiaire",
+        "entreprise": "Traduc'entreprise, Paris (75)",
+        "periode": "juillet 2022",
+        "taches": ["Révision de traduction", "Traduction de notices d'utilisation", "Traduction de documents pour des particuliers"]
+      },
+      {
+        "poste": "Assistante de Direction Stagiaire",
+        "entreprise": "EDF, Paris (75)",
+        "periode": "février 2014",
+        "taches": ["Stage d'observation 3ème (1 semaine)", "Participation aux réunions", "Rédactions de comptes-rendus courts"]
+      }
+    ],
+    "benevolat": {
+      "poste": "Bénévole",
+      "organisation": "Le Secours Populaire, Paris (75)",
+      "periode": "mars 2021",
+      "taches": ["Collecte de nourriture", "Accueil des personnes en difficulté", "Animation d'atelier de sensibilisation"]
+    }
+  }
+}

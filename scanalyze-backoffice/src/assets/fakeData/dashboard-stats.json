@@ -1,0 +1,10 @@
+{
+  "mostProcessedType":      "Factures",
+  "mostProcessedTypeTrend": "+3 ce mois",
+  "extractionSuccessRate":  "91.2%",
+  "extractionSuccessTrend": "+1.8% vs mois dernier",
+  "lowConfidenceDocs":      "18",
+  "lowConfidenceTrend":     "-5 vs mois dernier",
+  "totalProcessed":         "24.1k",
+  "totalProcessedTrend":    "+12% ce mois"
+}

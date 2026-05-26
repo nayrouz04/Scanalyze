@@ -3,6 +3,7 @@
 import { createSlice }        from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { AuthState, SetCredentialsPayload } from "@models/authModels";
+import type { RootState } from "@app/store";
 
 // Initial state — no user is authenticated at app startup
 const initialState: AuthState = {
@@ -34,3 +35,8 @@ const authSlice = createSlice({
 
 export const { setCredentials, logout } = authSlice.actions;
 export default authSlice.reducer;
+
+// ── Selectors ─────────────────────────────────────────────────────────────────
+export const selectCurrentUser     = (state: RootState) => state.auth.user;
+export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
+export const selectToken           = (state: RootState) => state.auth.token;

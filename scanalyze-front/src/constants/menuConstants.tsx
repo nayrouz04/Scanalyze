@@ -1,27 +1,18 @@
-// menuConstants.tsx — sidebar navigation items grouped by user role
-// Import the correct menu in Sidebar based on user.role
+// menuConstants.tsx — navigation sidebar du frontoffice utilisateur
 import React from "react";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import PeopleIcon    from "@mui/icons-material/People";
-import HistoryIcon   from "@mui/icons-material/History";
+import FolderIcon    from "@mui/icons-material/Folder";  // ✅ remplace HistoryIcon
 import { ROUTES }    from "./routeConstants";
 
-// MenuItem — shape of a single navigation entry
+// MenuItem — structure d'un élément de navigation
 export interface MenuItem {
   text: string;
   icon: React.ReactElement;
   path: string;
 }
 
-// Admin menu — includes user management in addition to shared pages
-export const ADMIN_MENU: MenuItem[] = [
-  { text: "Dashboard",  icon: <DashboardIcon />, path: ROUTES.HOME       },
-  { text: "Historique", icon: <HistoryIcon />,   path: ROUTES.HISTORIQUE },
-  { text: "Users",      icon: <PeopleIcon />,    path: ROUTES.USERS      },
-];
-
-// User menu — access to shared pages only (no admin sections)
+// USER_MENU — pages accessibles par l'utilisateur
 export const USER_MENU: MenuItem[] = [
-  { text: "Dashboard",  icon: <DashboardIcon />, path: ROUTES.HOME       },
-  { text: "Historique", icon: <HistoryIcon />,   path: ROUTES.HISTORIQUE },
+  { text: "Dashboard", icon: <DashboardIcon />, path: ROUTES.HOME       },
+  { text: "Documents", icon: <FolderIcon />,    path: ROUTES.HISTORIQUE }, // ✅ renommé
 ];

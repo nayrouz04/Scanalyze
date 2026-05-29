@@ -2,6 +2,7 @@
 app/main.py – FastAPI application factory
 """
 import logging
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 from fastapi import FastAPI
@@ -12,10 +13,31 @@ from app.config import get_settings
 from app.core.middleware import RateLimitMiddleware, RequestLoggingMiddleware
 from app.core.exceptions import register_exception_handlers
 from app.api.v1.router import main_router
+from app.services.document_service import get_s3_client
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+async def create_minio_buckets() -> None:
+    """Create MinIO buckets at startup if they don't exist."""
+    buckets = [settings.S3_BUCKET_UPLOADS, settings.S3_BUCKET_RESULTS]
+    try:
+        s3 = get_s3_client()
+        for bucket in buckets:
+            try:
+                s3.head_bucket(Bucket=bucket)
+                logger.info("MinIO bucket already exists: %s", bucket)
+            except Exception:
+                s3.create_bucket(Bucket=bucket) 
+                logger.info("MinIO bucket created: %s", bucket)
+    except Exception as e:
+        logger.error("Failed to connect to MinIO: %s", e)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ──────────────────────────────
+    await create_minio_buckets()
+    logger.info("Vision AI started | env=%s debug=%s", settings.APP_ENV, settings.DEBUG)
+    yield
 
 def create_app() -> FastAPI:
     # ── Sentry (prod / staging only) ──────────
@@ -29,6 +51,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Vision AI API",
         version="1.0.0",
+        lifespan=lifespan, 
         docs_url="/docs" if not settings.is_prod else None,   # hide Swagger in prod
         redoc_url="/redoc" if not settings.is_prod else None,
         openapi_url="/openapi.json" if not settings.is_prod else None,

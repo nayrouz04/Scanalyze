@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.document import Document
 from app.models.job import ExtractionJob
 from app.models.user import User
+from app.workers.task import process_document
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,14 @@ class JobService:
         self.db.add(job)
         await self.db.flush()  
         
+        process_document.delay(
+            job_id=str(job.id),
+            document_id=str(document_id),
+        )
+        #__ 5 send the task to celery
         logger.info(
-            "Job created for document %s by user %s",
-            document_id, current_user.email
+            "Job %s created and sent to Celery for document %s by user %s",
+            job.id, document_id, current_user.email
         )
         return job
     

@@ -1,6 +1,22 @@
-// Re-exports all service modules from a single entry point.
-// Consumers should import from "../services" instead of individual files.
-
-export * from "./api";
-export * from "./authApi";
-export * from "./documentsApi";
+// src/services/index.ts
+export { baseApi }                          from "./api";
+export {
+  authApi,
+  useLoginMutation,
+  useRegisterMutation,
+  useForgotPasswordMutation,
+  useChangePasswordMutation,
+}                                           from "./authApi";
+export {
+  documentsApi,
+  useGetAllDocumentsQuery,
+  useGetMyDocumentsQuery,
+  useGetDocumentByIdQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
+}                                           from "./documentsApi";
+export {
+  jobsApi,
+  useCreateJobMutation,
+  useGetJobByIdQuery,
+}                                           from "./jobsApi";

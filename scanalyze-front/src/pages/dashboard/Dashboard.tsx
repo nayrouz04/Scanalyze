@@ -20,7 +20,8 @@ import VisibilityIcon      from "@mui/icons-material/Visibility";
 import CloseIcon           from "@mui/icons-material/Close";
 import OpenInNewIcon       from "@mui/icons-material/OpenInNew";
 import { useNavigate }     from "react-router-dom";
-import { useGetResultsQuery } from "@services";
+import { useGetMyDocumentsQuery } from "@services";
+
 import { colors, tableHeadCellSx, tableCellSx, dialogSx } from "@theme";
 import { ROUTES } from "@constants";
 import fakeDocs from "../../assets/fakeData/dashboard-documents.json";
@@ -90,10 +91,10 @@ export default function Dashboard() {
   const navigate = useNavigate();
  
   const {
-    data: liveDocuments = [],
-    isLoading: loadingDocs,
-    isError:   errorDocs,
-  } = useGetResultsQuery(undefined, { skip: USE_FAKE_DATA });
+  data: liveDocuments = [],
+  isLoading: loadingDocs,
+  isError:   errorDocs,
+} = useGetMyDocumentsQuery(undefined, { skip: USE_FAKE_DATA });
  
   const documents     = USE_FAKE_DATA ? fakeDocs : liveDocuments;
   const isLoadingDocs = USE_FAKE_DATA ? false : loadingDocs;

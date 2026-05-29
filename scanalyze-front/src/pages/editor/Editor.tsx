@@ -7,7 +7,8 @@ import {
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CircleIcon       from "@mui/icons-material/Circle";
 import { useNavigate }  from "react-router-dom";
-import { useGetResultsQuery } from "@services";
+import { useGetMyDocumentsQuery } from "@services";
+
 import { colors }             from "@theme";
 import { ROUTES }             from "@constants";
 import { useStepper }         from "@features/stepper";
@@ -84,7 +85,7 @@ export default function Editor() {
   const { completeStep } = useStepper();
  
   const { data, isLoading: liveLoading, isError: liveError } =
-    useGetResultsQuery(undefined, { skip: USE_FAKE_DATA });
+  useGetMyDocumentsQuery(undefined, { skip: USE_FAKE_DATA });
  
   const isLoading = USE_FAKE_DATA ? false : liveLoading;
   const isError   = USE_FAKE_DATA ? false : liveError;

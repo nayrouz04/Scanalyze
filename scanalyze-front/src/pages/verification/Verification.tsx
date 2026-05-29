@@ -15,7 +15,8 @@ import AutoFixHighIcon  from "@mui/icons-material/AutoFixHigh";
 import CloseIcon        from "@mui/icons-material/Close";
 import ArrowBackIcon    from "@mui/icons-material/ArrowBack";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useGetResultsQuery } from "@services";
+import { useGetMyDocumentsQuery } from "@services";
+
 import { colors }             from "@theme";
 import { useStepper }         from "@features/stepper";
 import { ROUTES }             from "@constants";
@@ -206,7 +207,8 @@ export default function Verification() {
     docType?: string;
   } | null;
  
-  const { data, isLoading } = useGetResultsQuery(undefined, { skip: USE_FAKE_DATA });
+  const { data, isLoading } = useGetMyDocumentsQuery(undefined, { skip: USE_FAKE_DATA });
+
   const documents = USE_FAKE_DATA ? fakeResults : (data ?? []);
  
   const initialIndex = (() => {

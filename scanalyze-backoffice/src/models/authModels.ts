@@ -1,22 +1,46 @@
-// authModels.ts — TypeScript interfaces for authentication-related data
-// Used across authSlice.ts, authApi.ts, and PrivateRoute.tsx
+// src/models/authModels.ts
+export interface LoginRequest {
+  login: string;      // email dans ton API
+  password: string;
+}
 
-// User — represents an authenticated user in the system
-export interface User {
-  name:  string;
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface RegisterRequest {
   email: string;
-  role:  "admin" | "user";
+  password: string;
+  full_name: string;
+  office_address: string;
+  role?: 'admin' | 'user';
 }
 
-// AuthState — shape of the auth slice in the Redux store
-export interface AuthState {
-  user:            User | null;
-  token:           string | null;
-  isAuthenticated: boolean;
+export interface RegisterResponse {
+  access_token: string;
 }
 
-// SetCredentialsPayload — data dispatched after a successful login response
-export interface SetCredentialsPayload {
-  user:  User;
-  token: string;
+export interface ForgotPasswordRequest { email: string; }
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  office_address: string;
+  phone_nbr?: string;
+  role: 'admin' | 'user';
+  is_active: boolean;
+}
+
+export interface DashboardStats {
+  total_users: number;
+  total_documents: number;
+  total_jobs: number;
+  // adapte selon la réponse réelle de ton API
 }

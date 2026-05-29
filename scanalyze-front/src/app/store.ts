@@ -1,29 +1,25 @@
-// configureStore — RTK function that creates the Redux store
+// src/app/store.ts
 import { configureStore } from "@reduxjs/toolkit";
+import { setupListeners } from "@reduxjs/toolkit/query";
+import { baseApi }     from "../services/api";
+import authReducer     from "../features/auth/authSlice";
 
-// RTK Query API slice — contains all endpoints (documents, users, etc.)
-import { api } from "@services";
 
-// Auth reducer — manages user session, token, and authentication state
-import authReducer from "@features/auth/authSlice";
+import "../services/authApi";
+import "../services/documentsApi";
+import "../services/jobsApi";
 
-// Create and configure the Redux store
+
 export const store = configureStore({
   reducer: {
-    // Authentication state slice
+    [baseApi.reducerPath]: baseApi.reducer,
     auth: authReducer,
-
-    // RTK Query cache state — keyed by the API's reducerPath
-    [api.reducerPath]: api.reducer,
   },
-
-  // Append RTK Query middleware for caching, invalidation, and polling
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(api.middleware),
+    getDefaultMiddleware().concat(baseApi.middleware),
 });
 
-// RootState — full type of the Redux state tree
-export type RootState = ReturnType<typeof store.getState>;
+setupListeners(store.dispatch);
 
-// AppDispatch — type of the store's dispatch function
+export type RootState   = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

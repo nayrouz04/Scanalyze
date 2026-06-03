@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Box, Typography, TextField, Button, CircularProgress,
   Alert, Chip, Tooltip, Popover, List, ListItem,
@@ -15,15 +15,20 @@ import AutoFixHighIcon  from "@mui/icons-material/AutoFixHigh";
 import CloseIcon        from "@mui/icons-material/Close";
 import ArrowBackIcon    from "@mui/icons-material/ArrowBack";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useGetMyDocumentsQuery } from "@services";
+import {
+  useApproveJobMutation,
+  useGetDocumentByIdQuery,
+  useGetExtractedFieldsQuery,
+  useLazyGetDocumentDownloadUrlQuery,
+  useSkipFieldMutation,
+  useValidateFieldMutation,
+} from "@services";
 
 import { colors }             from "@theme";
 import { useStepper }         from "@features/stepper";
 import { ROUTES }             from "@constants";
+import { API_BASE_URL }       from "@constants/apiConstants";
 import PipelineStepper        from "@components/common/PipelineStepper";
- 
-import fakeVerifRaw from "@assets/fakeData/verification-results.json";
-import cvImage      from "@assets/fakeData/cv_emilie_michaud.png";
  
 // ── Types ────────────────────────────────────────────────────────────────────
 interface BBox        { x: number; y: number; w: number; h: number; }
@@ -40,14 +45,6 @@ const DISABLED_TEXT = "#334155";  // texte bouton disabled (plus sombre que text
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const getVal  = (entry: any): string      => entry?.value !== undefined ? String(entry.value) : String(entry ?? "");
 const getBbox = (entry: any): BBox | null => entry?.bbox ?? null;
- 
-const USE_FAKE_DATA = true;
- 
-const fakeResults = (fakeVerifRaw as any[]).map((doc) =>
-  doc.original_filename === "cv_emilie_michaud.png"
-    ? { ...doc, file_url: cvImage }
-    : doc
-);
  
 // ── AI suggestions API call ──────────────────────────────────────────────────
 async function fetchAISuggestions(
@@ -78,21 +75,31 @@ Réponds UNIQUEMENT avec un JSON valide, sans aucun texte avant ou après, sans 
   {"value": "suggestion 2", "reason": "explication courte en français"},
   {"value": "suggestion 3", "reason": "explication courte en français"}
 ]`;
+
+  void prompt;
  
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const token = localStorage.getItem("access_token");
+  const response = await fetch(`${API_BASE_URL}/ai/suggestions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
+      field_key: fieldKey,
+      current_value: currentValue,
+      doc_type: docType,
+      all_fields: Object.fromEntries(
+        Object.entries(allFields).map(([key, value]) => [key, getVal(value)])
+      ),
     }),
   });
- 
-  const data  = await response.json();
-  const text  = data.content?.map((b: any) => b.text ?? "").join("") ?? "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean) as AISuggestion[];
+
+  if (!response.ok) {
+    throw new Error("AI suggestions request failed");
+  }
+
+  return await response.json() as AISuggestion[];
 }
  
 // ── SuggestionPopover ────────────────────────────────────────────────────────
@@ -188,7 +195,7 @@ function SuggestionPopover({
       {/* Footer */}
       <Box sx={{ px: 2, py: 1, bgcolor: colors.bgCard, borderTop: `1px solid ${colors.borderCard}`, display: "flex", alignItems: "center", gap: 0.8 }}>
         <AutoFixHighIcon sx={{ fontSize: 12, color: colors.textMuted }} />
-        <Typography variant="caption" color={colors.textMuted} fontSize={10}>Powered by Claude · Cliquez pour appliquer</Typography>
+        <Typography variant="caption" color={colors.textMuted} fontSize={10}>Powered by Ollama · Cliquez pour appliquer</Typography>
       </Box>
     </Popover>
   );
@@ -203,25 +210,27 @@ export default function Verification() {
   const historyState = location.state as {
     fromHistory?: boolean;
     documentId?: string;
+    document_id?: string;
+    jobId?: string;
+    job_id?: string;
     sourceDocument?: string;
     docType?: string;
   } | null;
- 
-  const { data, isLoading } = useGetMyDocumentsQuery(undefined, { skip: USE_FAKE_DATA });
 
-  const documents = USE_FAKE_DATA ? fakeResults : (data ?? []);
+  const documentId = historyState?.documentId ?? historyState?.document_id ?? null;
+  const jobId = historyState?.jobId ?? historyState?.job_id ?? null;
+
+  const { data: document, isLoading: documentLoading } = useGetDocumentByIdQuery(documentId ?? "", { skip: !documentId });
+  const { data: extractedFields = [], isLoading: fieldsLoading } = useGetExtractedFieldsQuery(jobId ?? "", { skip: !jobId });
+  const [getDocumentDownloadUrl, { isFetching: previewLoading }] = useLazyGetDocumentDownloadUrlQuery();
+  const [validateField, { isLoading: validating }] = useValidateFieldMutation();
+  const [skipField, { isLoading: skipping }] = useSkipFieldMutation();
+  const [approveJob, { isLoading: approving }] = useApproveJobMutation();
+
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
  
-  const initialIndex = (() => {
-    if (!historyState?.fromHistory || !historyState.documentId) return 0;
-    const idxById = documents.findIndex((d: any) => d.id === historyState.documentId);
-    if (idxById !== -1) return idxById;
-    const idxByName = documents.findIndex((d: any) =>
-      (d.original_filename ?? d.filename ?? "") === historyState.sourceDocument
-    );
-    return idxByName !== -1 ? idxByName : 0;
-  })();
- 
-  const [docIndex,    setDocIndex]    = useState(initialIndex);
+  const docIndex = 0;
   const [fields,      setFields]      = useState<Record<string, any>>({});
   const [corrected,   setCorrected]   = useState<Record<string, boolean>>({});
   const [approved,    setApproved]    = useState(false);
@@ -255,16 +264,67 @@ export default function Verification() {
   }, [activeField, fields, computeOverlay]);
  
   useEffect(() => {
-    const doc = documents[docIndex];
-    if (doc?.extracted_data) {
-      setFields(doc.extracted_data);
-      setCorrected({}); setApproved(false); setEditMode(false);
-      setActiveField(null); setOverlayRect(null); setAiAnchorEl(null);
+    const nextFields = extractedFields.reduce<Record<string, any>>((acc, field) => {
+      const bbox = [field.bbox_x, field.bbox_y, field.bbox_w, field.bbox_h].every((v) => typeof v === "number")
+        ? { x: field.bbox_x, y: field.bbox_y, w: field.bbox_w, h: field.bbox_h }
+        : null;
+
+      acc[field.field_name] = {
+        id: field.id,
+        label: field.field_label ?? field.field_name,
+        value: field.normalized_value ?? field.raw_value ?? field.ocr_value ?? "",
+        bbox,
+        confidence: field.confidence,
+        is_validated: field.is_validated,
+        is_skipped: field.is_skipped,
+      };
+      return acc;
+    }, {});
+
+    setFields(nextFields);
+    setCorrected({});
+    setApproved(false);
+    setEditMode(false);
+    setActiveField(null);
+    setOverlayRect(null);
+    setAiAnchorEl(null);
+  }, [extractedFields]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!documentId) {
+      setFileUrl(null);
+      return;
     }
-  }, [docIndex, data]);
- 
-  const currentDoc = documents[docIndex];
-  const totalDocs  = documents.length;
+
+    getDocumentDownloadUrl(documentId)
+      .unwrap()
+      .then(({ url }) => {
+        if (!cancelled) setFileUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError("Impossible de charger l'aperçu du document.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId, getDocumentDownloadUrl]);
+
+  const currentDoc = useMemo(() => {
+    if (!document && !historyState?.sourceDocument) return null;
+    return {
+      ...(document ?? {}),
+      id: documentId,
+      original_filename: document?.original_filename ?? historyState?.sourceDocument,
+      filename: document?.filename ?? historyState?.sourceDocument,
+      doc_type: historyState?.docType ?? document?.file_type ?? "document",
+      file_url: fileUrl,
+    };
+  }, [document, documentId, fileUrl, historyState?.docType, historyState?.sourceDocument]);
+
+  const totalDocs  = currentDoc ? 1 : 0;
   const docType    = currentDoc?.doc_type ?? "document";
  
   const handleChange = (key: string, newVal: string) => {
@@ -281,15 +341,40 @@ export default function Verification() {
     requestAnimationFrame(() => setOverlayRect(computeOverlay(bbox)));
   };
  
-  const handleSkip    = () => { if (docIndex < totalDocs - 1) setDocIndex((i) => i + 1); };
+  const handleSkip = async () => {
+    if (activeField && fields[activeField]?.id) {
+      await skipField(fields[activeField].id).unwrap();
+      setFields((prev) => ({
+        ...prev,
+        [activeField]: { ...prev[activeField], is_skipped: true },
+      }));
+      setActiveField(null);
+      setOverlayRect(null);
+    }
+  };
   const handleCorrect = () => setEditMode(true);
  
-  const handleApprove = () => {
-    setEditMode(false); setApproved(true);
+  const handleApprove = async () => {
+    if (!jobId) return;
+
+    const changedEntries = Object.entries(corrected).filter(([, changed]) => changed);
+    for (const [key] of changedEntries) {
+      const field = fields[key];
+      if (field?.id) {
+        await validateField({
+          fieldId: field.id,
+          normalizedValue: getVal(field),
+        }).unwrap();
+      }
+    }
+
+    await approveJob(jobId).unwrap();
+    setEditMode(false);
+    setApproved(true);
     setTimeout(() => {
       if (historyState?.fromHistory) { navigate(ROUTES.HISTORY ?? (-1 as any)); return; }
-      if (docIndex < totalDocs - 1) { setDocIndex((i) => i + 1); setApproved(false); }
-      else { completeStep(2); navigate(ROUTES.EXPORT); }
+      completeStep(2);
+      navigate(ROUTES.EXPORT, { state: { document_id: documentId, job_id: jobId } });
     }, 800);
   };
  
@@ -307,6 +392,12 @@ export default function Verification() {
     const fileName: string = currentDoc?.original_filename ?? currentDoc?.filename ?? "";
     const isPdf    = fileName.toLowerCase().endsWith(".pdf");
  
+    if (previewLoading) return (
+      <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: colors.bgPage }}>
+        <CircularProgress size={28} />
+      </Box>
+    );
+
     if (!fileUrl) return (
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", bgcolor: colors.bgPage, gap: 2 }}>
         <Typography sx={{ fontSize: 48 }}>📄</Typography>
@@ -376,11 +467,13 @@ export default function Verification() {
     );
   };
  
-  if (isLoading && !USE_FAKE_DATA) return (
+  if (documentLoading || fieldsLoading) return (
     <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress /></Box>
   );
  
-  if (!currentDoc) return <Alert severity="info">Aucun document à vérifier.</Alert>;
+  if (!jobId || !documentId) return <Alert severity="info">Aucun document a verifier. Lancez la verification depuis l'etape Editor.</Alert>;
+  if (!currentDoc) return <Alert severity="info">Document introuvable.</Alert>;
+  if (loadError) return <Alert severity="error">{loadError}</Alert>;
  
   const goToHistory = () => navigate(ROUTES.HISTORY ?? (-1 as any));
  
@@ -460,13 +553,21 @@ export default function Verification() {
               <Typography variant="caption" color={colors.blueMuted} letterSpacing={1.5} fontWeight={700} fontSize={11}>EXTRACTED FIELDS</Typography>
               <Typography variant="caption" color={colors.textMuted} fontSize={10} ml="auto">📍 Cliquez pour localiser</Typography>
             </Box>
- 
+
+            {Object.keys(fields).length === 0 && (
+              <Alert severity="info" sx={{ bgcolor: colors.bgHover, color: colors.textMuted }}>
+                Aucun champ extrait pour ce job.
+              </Alert>
+            )}
+
             {Object.entries(fields).map(([key, entry]) => {
-              const label       = key.toUpperCase().replace(/_/g, " ");
+              const label       = (entry?.label ?? key).toUpperCase().replace(/_/g, " ");
               const value       = getVal(entry);
               const bbox        = getBbox(entry);
               const hasBbox     = !!bbox;
               const isCorrected = corrected[key];
+              const isSkipped   = entry?.is_skipped;
+              const isValidated = entry?.is_validated;
               const isActive    = activeField === key;
               const isMultiline = value.length > 60;
  
@@ -514,13 +615,18 @@ export default function Verification() {
                           </IconButton>
                         </Tooltip>
                       )}
-                      {isCorrected ? (
+                      {isSkipped ? (
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <WarningAmberIcon sx={{ fontSize: 12, color: colors.textMuted }} />
+                          <Typography variant="caption" color={colors.textMuted} fontSize={10}>Skipped</Typography>
+                        </Box>
+                      ) : isCorrected ? (
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                           <WarningAmberIcon sx={{ fontSize: 12, color: colors.amber }} />
                           <Typography variant="caption" color={colors.amber} fontSize={10}>Corrected</Typography>
                         </Box>
                       ) : (
-                        <CheckCircleIcon sx={{ fontSize: 14, color: colors.green }} />
+                        <CheckCircleIcon sx={{ fontSize: 14, color: isValidated ? colors.green : colors.textMuted }} />
                       )}
                     </Box>
                   </Box>
@@ -577,7 +683,7 @@ export default function Verification() {
  
           <Tooltip title="ALT+S">
             <Button startIcon={<SkipNextIcon />} onClick={handleSkip} size="small"
-              disabled={docIndex >= totalDocs - 1}
+              disabled={!activeField || !fields[activeField]?.id || skipping}
               sx={{ color: colors.textMuted, border: `1px solid ${colors.borderCard}`, "&:hover": { bgcolor: colors.borderCard, color: colors.textWhite }, "&:disabled": { color: DISABLED_TEXT } }}>
               Skip
             </Button>
@@ -598,7 +704,7 @@ export default function Verification() {
           </Tooltip>
  
           <Tooltip title="ALT+A">
-            <Button variant="contained" startIcon={<TaskAltIcon />} onClick={handleApprove} size="small" sx={{ fontWeight: "bold" }}>
+            <Button variant="contained" startIcon={<TaskAltIcon />} onClick={handleApprove} size="small" disabled={approving || validating || Object.keys(fields).length === 0} sx={{ fontWeight: "bold" }}>
               {historyState?.fromHistory ? "Approuver & retour" : "Approve"}
             </Button>
           </Tooltip>

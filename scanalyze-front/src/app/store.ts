@@ -8,6 +8,7 @@ import authReducer     from "../features/auth/authSlice";
 import "../services/authApi";
 import "../services/documentsApi";
 import "../services/jobsApi";
+import "../services/resultsApi";
 
 
 export const store = configureStore({

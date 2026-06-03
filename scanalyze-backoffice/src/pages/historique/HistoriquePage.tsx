@@ -58,11 +58,26 @@ const DEFAULT_TYPES = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const formatDate = (iso: string): string =>
-  new Date(iso).toLocaleString("fr-FR", {
+const formatDate = (iso?: string): string => {
+  if (!iso) return "—";
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("fr-FR", {
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+};
+
+const getUploadDate = (doc: Document) => doc.uploaded_at ?? doc.created_at;
+
+const getDocumentType = (doc: Document) => doc.doc_type ?? doc.file_type;
+
+const getDocumentCategory = (doc: Document) => {
+  const type = doc.doc_type;
+  return type === "invoice" || type === "cv" || type === "contract" ? type : "other";
+};
 
 const typeChipSx = (type?: string) => {
   if (type === "invoice")  return { bgcolor: "#5c7cfa22",             color: "#5c7cfa"        };
@@ -72,15 +87,19 @@ const typeChipSx = (type?: string) => {
 };
 
 const statusChipSx = (status: string) => {
+  if (status === "uploaded")   return { bgcolor: "#5c7cfa22", color: "#5c7cfa" };
   if (status === "done")       return { bgcolor: `${colors.green}22`, color: colors.green };
   if (status === "processing") return { bgcolor: `${colors.amber}22`, color: colors.amber };
+  if (status === "failed")     return { bgcolor: `${colors.red}22`,   color: colors.red   };
   if (status === "error")      return { bgcolor: `${colors.red}22`,   color: colors.red   };
   return { bgcolor: "#ffffff15", color: colors.textMuted };
 };
 
 const statusLabel: Record<string, string> = {
+  uploaded:   "Uploadé",
   pending:    "En attente",
   processing: "En cours",
+  failed:     "Échoué",
   done:       "Terminé",
   error:      "Échoué",
 };
@@ -98,10 +117,12 @@ const JsonPreviewModal: React.FC<JsonPreviewModalProps> = ({ doc, onClose }) => 
   const jsonContent = {
     document_id:  doc.id,
     filename:     doc.filename,
+    original_filename: doc.original_filename,
+    file_type:    doc.file_type,
     doc_type:     doc.doc_type ?? "—",
     status:       doc.status,
-    owner_id:     doc.owner_id,
-    created_at:   doc.created_at,
+    owner_id:     doc.owner_id ?? null,
+    uploaded_at:  doc.uploaded_at,
   };
 
   const handleExport = () => {
@@ -157,15 +178,15 @@ const JsonPreviewModal: React.FC<JsonPreviewModalProps> = ({ doc, onClose }) => 
             size="small"
             sx={statusChipSx(doc.status)}
           />
-          {doc.doc_type && (
+          {getDocumentType(doc) && (
             <Chip
-              label={`Type : ${doc.doc_type}`}
+              label={`Type : ${getDocumentType(doc)}`}
               size="small"
-              sx={typeChipSx(doc.doc_type)}
+              sx={typeChipSx(getDocumentType(doc))}
             />
           )}
           <Chip
-            label={`Traité le : ${formatDate(doc.created_at)}`}
+            label={`Uploadé le : ${formatDate(getUploadDate(doc))}`}
             size="small" icon={<CalendarTodayIcon sx={{ fontSize: 13 }} />}
             sx={{
               bgcolor: `${colors.amber}22`, color: colors.amber, fontSize: 11,
@@ -270,10 +291,10 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ doc, onClose 
               Détails du document
             </Typography>
           </Box>
-          {doc.doc_type && (
+          {getDocumentType(doc) && (
             <Chip
-              label={doc.doc_type} size="small"
-              sx={{ fontSize: 11, fontWeight: 600, ml: 1, ...typeChipSx(doc.doc_type) }}
+              label={getDocumentType(doc)} size="small"
+              sx={{ fontSize: 11, fontWeight: 600, ml: 1, ...typeChipSx(getDocumentType(doc)) }}
             />
           )}
         </Box>
@@ -287,8 +308,8 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ doc, onClose 
           {[
             { label: "ID",           value: doc.id         },
             { label: "Fichier",      value: doc.filename   },
-            { label: "Propriétaire", value: doc.owner_id   },
-            { label: "Date upload",  value: formatDate(doc.created_at) },
+            { label: "Propriétaire", value: doc.owner_id ?? "—" },
+            { label: "Date upload",  value: formatDate(getUploadDate(doc)) },
           ].map(({ label, value }) => (
             <Box
               key={label}
@@ -489,7 +510,7 @@ const HistoryPage: React.FC = () => {
       doc.filename.toLowerCase().includes(search.toLowerCase()) ||
       doc.id.toLowerCase().includes(search.toLowerCase());
     const matchType =
-      typeFilter === "all" || doc.doc_type === typeFilter;
+      typeFilter === "all" || getDocumentCategory(doc) === typeFilter;
     return matchSearch && matchType;
   });
 
@@ -702,16 +723,16 @@ const HistoryPage: React.FC = () => {
                       variant="body2"
                       sx={{ color: "#5c7cfa", fontFamily: "monospace", fontSize: "0.82rem" }}
                     >
-                      {doc.id.slice(0, 8)}…
+                      {doc.id ? `${doc.id.slice(0, 8)}…` : "—"}
                     </Typography>
                   </TableCell>
 
                   {/* Type */}
                   <TableCell>
-                    {doc.doc_type ? (
+                    {getDocumentType(doc) ? (
                       <Chip
-                        label={doc.doc_type} size="small"
-                        sx={{ fontSize: 11, fontWeight: 600, textTransform: "capitalize", ...typeChipSx(doc.doc_type) }}
+                        label={getDocumentType(doc)} size="small"
+                        sx={{ fontSize: 11, fontWeight: 600, textTransform: "capitalize", ...typeChipSx(getDocumentType(doc)) }}
                       />
                     ) : (
                       <Typography variant="caption" sx={{ color: colors.textSecondary }}>—</Typography>
@@ -733,13 +754,13 @@ const HistoryPage: React.FC = () => {
                       variant="body2"
                       sx={{ color: colors.textSecondary, fontSize: "0.82rem", fontFamily: "monospace" }}
                     >
-                      {doc.owner_id.slice(0, 8)}…
+                      {doc.owner_id ? `${doc.owner_id.slice(0, 8)}…` : "—"}
                     </Typography>
                   </TableCell>
 
                   {/* Date */}
                   <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>
-                    {formatDate(doc.created_at)}
+                    {formatDate(getUploadDate(doc))}
                   </TableCell>
 
                   {/* Actions */}

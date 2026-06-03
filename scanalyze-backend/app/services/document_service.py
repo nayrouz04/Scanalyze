@@ -2,13 +2,13 @@
 app/services/document_service.py – Upload logic : validation + MinIO storage + DB save
 """
 from __future__ import annotations
-import uuid
+import uuid, fitz
 from datetime import datetime, timezone
 import boto3 # = the sender that uploads files to MinIO
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 import logging
 
 from app.config import get_settings
@@ -76,6 +76,21 @@ def validate_file(file: UploadFile, content: bytes) -> str:
 
     return ext
 
+def _count_pages(content: bytes, ext: str) -> int:
+    """
+    Count the nbr of pages in the document:
+    PDF -> use PyMuPDF to count pages
+    Images -> always 1 page
+    """
+    if ext == ".pdf":
+        try:
+            doc = fitz.open(stream=content, filetype="pdf")
+            return doc.page_count
+        except Exception as e:
+            logger.warning("Failed to count PDF pages: %s", str(e))
+            return 1  # fallback to 1 page if counting fails
+    return 1  # for images
+
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -120,7 +135,17 @@ class DocumentService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        #________ 5 Save in DataBase __________
+        #________ 5 Count pages _____________
+        pages = _count_pages(content, ext)
+
+        #________ 6 Calculate doc_nmbr _________
+        #Count the number of documents already uploaded by this user
+        result = await self.db.execute(
+            select(func.count(Document.id)).where(Document.user_id == current_user.id)
+        )
+        doc_count = result.scalar() or 0
+        doc_number = doc_count + 1  # Increment the count for the new document
+        #________ 7 Save in DataBase __________
         document = Document(
             user_id=current_user.id,
             filename=unique_filename,
@@ -128,6 +153,7 @@ class DocumentService:
             file_type=ext.lstrip("."),
             file_size=len(content),
             minio_path=minio_path,
+            doc_number=doc_number,
         )
 
         self.db.add(document)
@@ -144,6 +170,7 @@ class DocumentService:
             raise DocumentError("Only users can access this endpoint", status_code=403)
         result = await self.db.execute(
             select(Document).where(Document.user_id == current_user.id)
+            .where(Document.is_deleted == False)
         )
         return result.scalars().all()
     
@@ -152,27 +179,71 @@ class DocumentService:
         if current_user.role != "admin":
             raise DocumentError("Only admins can access this endpoint", status_code=403)
         
-        result = await self.db.execute(select(Document))
+        result = await self.db.execute(select(Document).where(Document.is_deleted == False))
         return result.scalars().all()
     
     async def get_document_by_id(self, document_id: uuid.UUID, current_user: User) -> Document:
         """Admin — return a specific document by ID"""
-        if current_user.role != "admin":
-            raise DocumentError("Only admins can access this endpoint", status_code=403) 
         result = await self.db.execute(
-            select(Document).where(Document.id == document_id)
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.is_deleted == False)
         )
         document = result.scalar_one_or_none()
         if not document:
             raise DocumentError("Document not found", status_code=404)
+
+        if current_user.role != "admin" and document.user_id != current_user.id:
+            raise DocumentError("Only the document owner can access this document", status_code=403)
+
         return document
-    
-    async def delete_document(self, document_id: uuid.UUID, current_user: User) -> None: 
+
+    async def get_document_for_download(self, document_id: uuid.UUID, current_user: User) -> Document:
+        """Return a document if the current user is allowed to access its file."""
+        result = await self.db.execute(
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.is_deleted == False)
+        )
+        document = result.scalar_one_or_none()
+        if not document:
+            raise DocumentError("Document not found", status_code=404)
+
+        if current_user.role != "admin" and document.user_id != current_user.id:
+            raise DocumentError("Only the document owner can access this file", status_code=403)
+
+        return document
+
+    def create_download_url(self, document: Document, expires_in: int = 300) -> str:
+        """Create a short-lived URL for the original file stored in MinIO."""
+        safe_name = document.original_filename.replace('"', "") or document.filename
+        try:
+            s3 = get_s3_client()
+            return s3.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": settings.S3_BUCKET_UPLOADS,
+                    "Key": document.minio_path,
+                    "ResponseContentDisposition": f'inline; filename="{safe_name}"',
+                },
+                ExpiresIn=expires_in,
+            )
+        except (BotoCoreError, ClientError) as e:
+            raise DocumentError(
+                f"Error during download URL generation: {str(e)}",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+    async def delete_document(self, document_id: uuid.UUID, current_user: User) -> None:
         """Admin — delete a document from DB and MinIO."""
         document = await self.get_document_by_id(document_id, current_user)
-        
+
+        #verify if document is already deleted
+        if document.is_deleted:
+            raise DocumentError("Document is already deleted", 400)
+
         # Delete from MinIO
-        try: 
+        try:
             s3 = get_s3_client()
             s3.delete_object(
                 Bucket=settings.S3_BUCKET_UPLOADS,
@@ -184,6 +255,9 @@ class DocumentService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         # Delete from DB
-        await self.db.delete(document)
+        document.is_deleted = True
+        document.deleted_at = datetime.now(timezone.utc)
+        document.deleted_by = current_user.id
+        #The document remains in the db but is marked as deleted
         await self.db.commit()
         logger.info("Document %s deleted by admin.", document_id)

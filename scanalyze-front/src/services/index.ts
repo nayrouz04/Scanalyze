@@ -8,10 +8,15 @@ export {
   useChangePasswordMutation,
 }                                           from "./authApi";
 export {
+  aiApi,
+  useGetAISuggestionsMutation,
+}                                           from "./aiApi";
+export {
   documentsApi,
   useGetAllDocumentsQuery,
   useGetMyDocumentsQuery,
   useGetDocumentByIdQuery,
+  useLazyGetDocumentDownloadUrlQuery,
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
 }                                           from "./documentsApi";
@@ -20,3 +25,13 @@ export {
   useCreateJobMutation,
   useGetJobByIdQuery,
 }                                           from "./jobsApi";
+export {
+  resultsApi,
+  useGetExtractedFieldsQuery,
+  useGetProcessingHistoryQuery,
+  useValidateFieldMutation,
+  useSkipFieldMutation,
+  useApproveJobMutation,
+  useExportJobResultsMutation,
+  useExportJobResultsPdfMutation,
+}                                           from "./resultsApi";

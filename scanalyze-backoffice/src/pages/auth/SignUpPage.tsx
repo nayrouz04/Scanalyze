@@ -3,11 +3,12 @@ import { useState }          from "react";
 import {
   Box, Paper, TextField, Button, Typography,
   Link, MenuItem, Select, InputLabel, FormControl,
-  Divider, CircularProgress,
+  Divider, CircularProgress, Alert,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import PersonIcon   from "@mui/icons-material/Person";
-import SecurityIcon from "@mui/icons-material/Security";
+import PersonIcon      from "@mui/icons-material/Person";
+import SecurityIcon    from "@mui/icons-material/Security";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useNavigate }         from "react-router-dom";
 import { useRegisterMutation } from "@services/authApi";
 import { colors }              from "@theme";
@@ -34,7 +35,6 @@ const INITIAL_FORM: FormState = {
   confirm:  "",
 };
 
-// Validation mot de passe — doit correspondre aux règles backend
 const validatePassword = (pwd: string): string | null => {
   if (pwd.length < 8)
     return "Le mot de passe doit contenir au moins 8 caractères.";
@@ -50,8 +50,11 @@ const validatePassword = (pwd: string): string | null => {
 export default function SignUpPage() {
   const navigate = useNavigate();
   const [registerUser, { isLoading }] = useRegisterMutation();
-  const [form,  setForm]  = useState<FormState>(INITIAL_FORM);
-  const [error, setError] = useState<string>("");
+  const [form,    setForm]    = useState<FormState>(INITIAL_FORM);
+  const [error,   setError]   = useState<string>("");
+  const [success, setSuccess] = useState<boolean>(false);
+  // ✅ on garde l'email saisi même après reset du form pour l'afficher dans l'écran succès
+  const [submittedEmail, setSubmittedEmail] = useState<string>("");
 
   const handleChange =
     (field: keyof FormState) =>
@@ -66,7 +69,6 @@ export default function SignUpPage() {
   const handleSignUp = async () => {
     setError("");
 
-    // Validation locale
     if (!form.fullName || !form.email || !form.password || !form.confirm || !form.address) {
       setError("Tous les champs obligatoires (*) doivent être remplis.");
       return;
@@ -91,10 +93,22 @@ export default function SignUpPage() {
 
     try {
       await registerUser(payload).unwrap();
-      navigate(ROUTES.HOME);
+      setSubmittedEmail(form.email);
+      setSuccess(true);
+      setForm(INITIAL_FORM);
 
     } catch (err: any) {
-      const data = err?.data;
+      const status = err?.status;
+      const data   = err?.data;
+
+      // ✅ Admin non vérifié qui re-soumet → email renvoyé côté backend, on affiche succès
+      if (status === 409 && form.role === "admin") {
+        setSubmittedEmail(form.email);
+        setSuccess(true);
+        setForm(INITIAL_FORM);
+        return;
+      }
+
       if (data?.errors && Array.isArray(data.errors)) {
         const messages = data.errors
           .map((e: any) => e.message ?? e.msg ?? JSON.stringify(e))
@@ -108,6 +122,53 @@ export default function SignUpPage() {
     }
   };
 
+  // ── Écran de succès ────────────────────────────────────────────────────────
+  if (success) {
+    return (
+      <Box sx={{
+        minHeight:       "100vh",
+        display:         "flex",
+        justifyContent:  "center",
+        alignItems:      "center",
+        backgroundColor: colors.bgPage,
+        py: 4,
+      }}>
+        <Paper sx={{ padding: 4, width: "90%", maxWidth: 480, borderRadius: 3, textAlign: "center" }}>
+          <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
+            <img src={logo} alt="Scanalyze" height={50} />
+          </Box>
+          <CheckCircleIcon sx={{ fontSize: 64, color: colors.green, mb: 2 }} />
+          <Typography variant="h6" fontWeight={700} color={colors.textWhite} mb={1}>
+            Compte créé avec succès !
+          </Typography>
+          <Typography variant="body2" color={colors.textMuted} mb={3}>
+            Un email de vérification a été envoyé à{" "}
+            <strong>{submittedEmail}</strong>.
+            <br />
+            Veuillez cliquer sur le lien dans l'email pour activer votre compte.
+            <br />
+            <Typography component="span" variant="body2" color={colors.amber}>
+              Ce lien expirera dans 24 heures.
+            </Typography>
+          </Typography>
+          <Alert severity="info" sx={{ mb: 3, textAlign: "left" }}>
+            Si vous ne trouvez pas l'email, vérifiez votre dossier spam ou
+            re-soumettez le formulaire pour renvoyer le lien.
+          </Alert>
+          <Button
+            fullWidth
+            variant="contained"
+            sx={{ py: 1.5 }}
+            onClick={() => navigate(ROUTES.LOGIN)}
+          >
+            Retour à la connexion
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // ── Formulaire ─────────────────────────────────────────────────────────────
   return (
     <Box sx={{
       minHeight:       "100vh",
@@ -119,12 +180,10 @@ export default function SignUpPage() {
     }}>
       <Paper sx={{ padding: 4, width: "90%", maxWidth: 560, borderRadius: 3 }}>
 
-        {/* Logo */}
         <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
           <img src={logo} alt="Scanalyze" height={50} />
         </Box>
 
-        {/* Personal Information */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <PersonIcon sx={{ color: colors.blueMuted }} />
           <Typography variant="body2" color={colors.blueMuted} fontWeight="bold" letterSpacing={1}>
@@ -132,7 +191,6 @@ export default function SignUpPage() {
           </Typography>
         </Box>
 
-        {/* Full Name + Phone */}
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
           <TextField
             fullWidth label="Full Name *" placeholder="John Doe"
@@ -144,15 +202,10 @@ export default function SignUpPage() {
           />
         </Box>
 
-        {/* Role */}
         <Box sx={{ mb: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Role</InputLabel>
-            <Select
-              value={form.role}
-              onChange={handleSelectChange("role")}
-              label="Role"
-            >
+            <Select value={form.role} onChange={handleSelectChange("role")} label="Role">
               <MenuItem value="" disabled>Select role</MenuItem>
               <MenuItem value="user">User</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
@@ -160,7 +213,6 @@ export default function SignUpPage() {
           </FormControl>
         </Box>
 
-        {/* Office Address */}
         <TextField
           fullWidth
           label="Office Address *"
@@ -172,7 +224,6 @@ export default function SignUpPage() {
 
         <Divider sx={{ my: 3 }} />
 
-        {/* Account Security */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <SecurityIcon sx={{ color: colors.blueMuted }} />
           <Typography variant="body2" color={colors.blueMuted} fontWeight="bold" letterSpacing={1}>
@@ -180,7 +231,6 @@ export default function SignUpPage() {
           </Typography>
         </Box>
 
-        {/* Email */}
         <TextField
           fullWidth
           label="Professional Email *"
@@ -191,7 +241,6 @@ export default function SignUpPage() {
           autoComplete="email"
         />
 
-        {/* Password + Confirm */}
         <Box sx={{ display: "flex", gap: 2 }}>
           <TextField
             fullWidth label="Password *" type="password"
@@ -208,14 +257,12 @@ export default function SignUpPage() {
           />
         </Box>
 
-        {/* Erreur */}
         {error && (
           <Typography color="error" variant="body2" mt={2} sx={{ whiteSpace: "pre-line" }}>
             {error}
           </Typography>
         )}
 
-        {/* Submit */}
         <Button
           fullWidth variant="contained"
           sx={{ mt: 3, py: 1.5, fontSize: "1rem" }}
@@ -228,7 +275,6 @@ export default function SignUpPage() {
           }
         </Button>
 
-        {/* Login link */}
         <Box sx={{ textAlign: "center", mt: 2 }}>
           <Typography variant="body2" color={colors.textMuted}>
             Already have an account?{" "}

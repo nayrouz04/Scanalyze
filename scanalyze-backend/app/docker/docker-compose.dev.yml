@@ -32,7 +32,7 @@ services:
       celery -A app.workers.celery_app worker
       --loglevel=debug
       --concurrency=1
-      --queues=pipeline,default
+      --queues=celery,pipeline,default
       --pool=solo            # easier to debug single-process
     volumes:
       - .:/app

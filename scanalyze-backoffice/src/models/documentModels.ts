@@ -1,12 +1,17 @@
 // src/models/documentModels.ts
 
 export interface Document {
-  id:         string;
-  filename:   string;
-  doc_type?:  string;   // null avant traitement OCR
-  status:     'pending' | 'processing' | 'done' | 'error';
-  created_at: string;
-  owner_id:   string;
+  id:                 string;
+  filename:           string;
+  original_filename?: string;
+  file_type:          string;
+  file_size?:         number;
+  doc_type?:          string | null;   // null avant traitement OCR
+  status:             'uploaded' | 'pending' | 'processing' | 'done' | 'failed' | 'error';
+  minio_path?:        string;
+  uploaded_at:        string;
+  created_at?:        string;
+  owner_id?:          string;
 }
 
 export interface Job {

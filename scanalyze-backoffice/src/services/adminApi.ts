@@ -1,12 +1,11 @@
-// src/services/adminApi.ts  (backoffice seulement)
-import { baseApi }                        from './api';
-import { API_ENDPOINTS }                  from '../constants/apiConstants';
+import { baseApi }       from './api';
+import { API_ENDPOINTS } from '../constants/apiConstants';
 import type { AdminUser, DashboardStats } from '../models/authModels';
 
 export const adminApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
 
-    // GET /admin/users
+    // GET /admin/users → liste complète
     listUsers: builder.query<AdminUser[], void>({
       query: () => API_ENDPOINTS.USERS,
       providesTags: (result) =>
@@ -15,7 +14,13 @@ export const adminApi = baseApi.injectEndpoints({
           : ['User'],
     }),
 
-    // POST /admin/users
+    // GET /admin/users/pending → users en attente
+    listPendingUsers: builder.query<AdminUser[], void>({
+      query: () => API_ENDPOINTS.USERS_PENDING,   // ← corrigé
+      providesTags: ['User'],
+    }),
+
+    // POST /admin/users → créer un user
     createUser: builder.mutation<AdminUser, Partial<AdminUser> & { password: string }>({
       query: (body) => ({
         url:    API_ENDPOINTS.USERS,
@@ -25,7 +30,7 @@ export const adminApi = baseApi.injectEndpoints({
       invalidatesTags: ['User'],
     }),
 
-    // PATCH /admin/users/:id
+    // PATCH /admin/users/:id → modifier un user
     updateUser: builder.mutation<AdminUser, { id: string; data: Partial<AdminUser> }>({
       query: ({ id, data }) => ({
         url:    API_ENDPOINTS.USER_BY_ID(id),
@@ -35,7 +40,7 @@ export const adminApi = baseApi.injectEndpoints({
       invalidatesTags: (_, __, { id }) => [{ type: 'User', id }],
     }),
 
-    // DELETE /admin/users/:id
+    // DELETE /admin/users/:id → supprimer un user
     deleteUser: builder.mutation<void, string>({
       query: (id) => ({
         url:    API_ENDPOINTS.USER_BY_ID(id),
@@ -44,25 +49,25 @@ export const adminApi = baseApi.injectEndpoints({
       invalidatesTags: (_, __, id) => [{ type: 'User', id }, 'User'],
     }),
 
-    // POST /admin/users/:id/enable
+    // POST /admin/users/:id/enable → activer
     enableUser: builder.mutation<void, string>({
       query: (id) => ({
         url:    API_ENDPOINTS.ENABLE_USER(id),
         method: 'POST',
       }),
-      invalidatesTags: (_, __, id) => [{ type: 'User', id }],
+      invalidatesTags: (_, __, id) => [{ type: 'User', id }, 'User'],
     }),
 
-    // POST /admin/users/:id/disable
+    // POST /admin/users/:id/disable → désactiver
     disableUser: builder.mutation<void, string>({
       query: (id) => ({
         url:    API_ENDPOINTS.DISABLE_USER(id),
         method: 'POST',
       }),
-      invalidatesTags: (_, __, id) => [{ type: 'User', id }],
+      invalidatesTags: (_, __, id) => [{ type: 'User', id }, 'User'],
     }),
 
-    // GET /admin/dashboard
+    // GET /admin/dashboard → stats KPIs
     getDashboardStats: builder.query<DashboardStats, void>({
       query: () => API_ENDPOINTS.DASHBOARD,
       providesTags: ['Dashboard'],
@@ -73,6 +78,7 @@ export const adminApi = baseApi.injectEndpoints({
 
 export const {
   useListUsersQuery,
+  useListPendingUsersQuery,
   useCreateUserMutation,
   useUpdateUserMutation,
   useDeleteUserMutation,

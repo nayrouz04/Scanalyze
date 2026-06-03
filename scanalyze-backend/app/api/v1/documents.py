@@ -66,7 +66,9 @@ async def upload(
             original_filename=document.original_filename,
             file_type=document.file_type,
             file_size=document.file_size,
+            doc_type_id=document.doc_type_id,
             status=document.status,
+            minio_path=document.minio_path,
             uploaded_at=document.uploaded_at,
         )
     except DocumentError as e:
@@ -93,7 +95,9 @@ async def get_my_documents(
                 original_filename=doc.original_filename,
                 file_type=doc.file_type,
                 file_size=doc.file_size,
+                doc_type_id=doc.doc_type_id,
                 status=doc.status,
+                minio_path=doc.minio_path,
                 uploaded_at=doc.uploaded_at,
             )
             for doc in documents    
@@ -123,7 +127,9 @@ async def get_all_documents(
                 original_filename=doc.original_filename,
                 file_type=doc.file_type,
                 file_size=doc.file_size,
+                doc_type_id=doc.doc_type_id,
                 status=doc.status,
+                minio_path=doc.minio_path,
                 uploaded_at=doc.uploaded_at,
             )
             for doc in documents
@@ -133,9 +139,25 @@ async def get_all_documents(
     
 #_______ GET document by ID (admin) ____________
 @router.get(
+    "/{document_id}/download-url",
+    summary="Get a temporary URL for the original document file",
+)
+async def get_document_download_url(
+    document_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        service = DocumentService(db)
+        document = await service.get_document_for_download(document_id, current_user)
+        return {"url": service.create_download_url(document)}
+    except DocumentError as e:
+        raise _document_error_to_http(e)
+
+@router.get(
     "/{document_id}",
     response_model=DocumentResponse,
-    summary="Get a specific document (admin ONLY)"
+    summary="Get a specific document (owner or admin)"
 ) 
 async def get_document_by_id(
     document_id: uuid.UUID,
@@ -152,7 +174,9 @@ async def get_document_by_id(
             original_filename=doc.original_filename,
             file_type=doc.file_type,
             file_size=doc.file_size,
+            doc_type_id=doc.doc_type_id,
             status=doc.status,
+            minio_path=doc.minio_path,
             uploaded_at=doc.uploaded_at,
         )
     except DocumentError as e:

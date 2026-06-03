@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { baseApi }     from '../services/api';
 import authReducer     from '../features/auth/authSlice';
+import { rtkQueryErrorLogger } from '../services/baseQueryWithReauth';
 
 // ── Backoffice : importer adminApi pour l'enregistrer
 import '../services/adminApi';
@@ -18,7 +19,7 @@ export const store = configureStore({
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(baseApi.middleware),
+    getDefaultMiddleware().concat(baseApi.middleware, rtkQueryErrorLogger),
 });
 
 setupListeners(store.dispatch);

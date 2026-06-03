@@ -5,8 +5,35 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OCR PIPELINE CONFIGURATION CLASSES
+# ═══════════════════════════════════════════════════════════════════════════
+
+class OCRPreprocessingConfig(BaseModel):
+    """Configuration for the preprocessing stage."""
+    enabled: bool = True
+    min_width: int = 1200
+    max_width: int = 2200
+    clahe_clip_limit: float = 2.0
+    clahe_tile_grid_size: tuple[int, int] = (8, 8)
+    adaptive_block_size: int = 31
+    adaptive_c: int = 11
+    denoise_blur_threshold: float = 80.0
+    noise_threshold: float = 9.0
+    contrast_threshold: float = 45.0
+    dark_threshold: float = 80.0
+    bright_threshold: float = 210.0
+    deskew_enabled: bool = True
+    perspective_correction_enabled: bool = True
+    shadow_correction_enabled: bool = True
+    orientation_candidates_enabled: bool = True
+    multi_pass_enabled: bool = True
+    border_cleanup_margin: int = 6
+    max_candidates: int = 6
 
 
 class Settings(BaseSettings):
@@ -17,7 +44,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:5174"]
 
     # ── Database ──────────────────────────────
     DATABASE_URL: str

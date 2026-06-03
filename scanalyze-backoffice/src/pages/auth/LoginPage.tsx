@@ -1,4 +1,4 @@
-// src/pages/auth/LoginPage.tsx  (backoffice)
+// src/pages/auth/LoginPage.tsx
 import { useState } from "react";
 import {
   Box, Paper, TextField, Button, Typography,
@@ -6,20 +6,14 @@ import {
 } from "@mui/material";
 import { useNavigate }       from "react-router-dom";
 import { useLoginMutation }  from "@services/authApi";
-import { useAppSelector }    from "@app/hooks";
-import { selectRole }        from "@features/auth/authSlice";
 import { colors }            from "@theme";
 import logo                  from "@assets/logo.svg";
 import { ROUTES }            from "@constants";
 
 export default function LoginPage() {
-  const navigate   = useNavigate();
+  const navigate = useNavigate();
 
-  // RTK Query — la mutation met à jour Redux automatiquement via extraReducers
   const [loginUser, { isLoading }] = useLoginMutation();
-
-  // Lecture du rôle depuis Redux après login (mis à jour par authSlice)
-  const role = useAppSelector(selectRole);
 
   const [email,      setEmail]      = useState<string>("");
   const [password,   setPassword]   = useState<string>("");
@@ -27,35 +21,22 @@ export default function LoginPage() {
   const [error,      setError]      = useState<string>("");
 
   const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) return; // 🛡️ garde
+
     try {
       setError("");
 
-      // unwrap() déclenche le catch si erreur HTTP
-      await loginUser({ login: email, password }).unwrap();
+      const result = await loginUser({ login: email, password }).unwrap();
 
-      // À ce stade, authSlice a déjà mis à jour state.auth via matchFulfilled
-      // On lit le rôle depuis le token décodé dans le slice
-      // NB : on relit depuis localStorage car le state Redux n'est pas encore
-      // disponible de façon synchrone ici — le slice l'a déjà persisté
-      const storedToken = localStorage.getItem("access_token");
-      let   parsedRole: string | null = null;
-
-      if (storedToken) {
-        try {
-          const payload = JSON.parse(atob(storedToken.split(".")[1]));
-          parsedRole    = payload.role ?? null;
-        } catch { /* token malformé */ }
-      }
+      const parsedRole = result.user.role;
 
       if (rememberMe) {
         localStorage.setItem("remember_me", "true");
       }
 
-      // Redirection selon le rôle
       if (parsedRole === "admin") {
-        navigate(ROUTES.HOME);   // HOME = /dashboard dans le backoffice
+        navigate(ROUTES.HOME);
       } else {
-        // Utilisateur normal sur le backoffice → non autorisé
         setError("Accès réservé aux administrateurs.");
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
@@ -63,7 +44,19 @@ export default function LoginPage() {
 
     } catch (err: any) {
       console.error(err);
-      setError("Email ou mot de passe incorrect.");
+
+      const status = err?.status;
+      if (status === 401) {
+        setError("Email ou mot de passe incorrect.");
+      } else if (status === 403) {
+        setError("Votre compte n'est pas encore vérifié. Vérifiez votre boîte mail.");
+      } else if (status === 422) {
+        setError("Email ou mot de passe invalide.");
+      } else if (status === 400) {
+        setError("Requête invalide. Vérifiez vos informations.");
+      } else {
+        setError("Une erreur est survenue. Réessayez plus tard.");
+      }
     }
   };
 
@@ -83,17 +76,14 @@ export default function LoginPage() {
     >
       <Paper sx={{ padding: 4, width: 400, borderRadius: 3 }}>
 
-        {/* Logo */}
         <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
           <img src={logo} alt="Scanalyze" height={50} />
         </Box>
 
-        {/* Titre */}
-        <Typography variant="h5" fontWeight={700} textAlign="center" mb={2}>
+        <Typography variant="h5" fontWeight={700} sx={{ textAlign: "center" }} mb={2}>
           Sign In
         </Typography>
 
-        {/* Email */}
         <TextField
           fullWidth
           label="Email"
@@ -104,7 +94,6 @@ export default function LoginPage() {
           autoComplete="email"
         />
 
-        {/* Password */}
         <TextField
           fullWidth
           label="Password"
@@ -116,7 +105,6 @@ export default function LoginPage() {
           autoComplete="current-password"
         />
 
-        {/* Remember me */}
         <FormControlLabel
           control={
             <Checkbox
@@ -133,20 +121,18 @@ export default function LoginPage() {
           sx={{ mt: 1 }}
         />
 
-        {/* Erreur */}
         {error && (
           <Typography color="error" variant="body2" mt={1}>
             {error}
           </Typography>
         )}
 
-        {/* Bouton */}
         <Button
           fullWidth
           variant="contained"
           sx={{ mt: 2, py: 1.5, fontSize: "1rem" }}
           onClick={handleLogin}
-          disabled={isLoading || !email || !password}
+          disabled={isLoading || !email.trim() || !password.trim()}
         >
           {isLoading
             ? <CircularProgress size={24} color="inherit" />
@@ -154,7 +140,6 @@ export default function LoginPage() {
           }
         </Button>
 
-        {/* Lien signup */}
         <Box sx={{ textAlign: "center", mt: 2 }}>
           <Typography variant="body2" color={colors.textMuted}>
             Don't have an account?{" "}

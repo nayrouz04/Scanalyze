@@ -32,6 +32,7 @@ import PipelineStepper   from "@components/common/PipelineStepper";
 const MAX_SIZE_MB    = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 const ACCEPTED       = ".pdf,.png,.jpg,.jpeg,.tiff";
+const ACCEPTED_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "tiff"];
 
 // ── Upload steps ──────────────────────────────────────────────────────────────
 const UPLOAD_STEPS = [
@@ -204,6 +205,7 @@ export default function Upload() {
   const [uploading,  setUploading]  = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string>("");
+  const [formatError, setFormatError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -215,8 +217,30 @@ export default function Upload() {
   const navigate = useNavigate();
 
   const handleFile = (f: File) => {
-    if (f.size > MAX_SIZE_BYTES) { setSizeError(true); setFile(null); setProgress(0); return; }
-    setSizeError(false); setUploadError(""); setFile(f); setProgress(0); reset();
+    const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+
+    if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+      setFormatError(true);
+      setSizeError(false);
+      setFile(null);
+      setProgress(0);
+      return;
+    }
+
+    if (f.size > MAX_SIZE_BYTES) {
+      setSizeError(true);
+      setFormatError(false);
+      setFile(null);
+      setProgress(0);
+      return;
+    }
+
+    setSizeError(false);
+    setFormatError(false);
+    setUploadError("");
+    setFile(f);
+    setProgress(0);
+    reset();
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -225,39 +249,29 @@ export default function Upload() {
     if (dropped) handleFile(dropped);
   };
 
-  const simulateProgress = (): Promise<void> =>
-    new Promise((resolve) => {
-      setUploading(true); setProgress(0);
-      let current = 0;
-      const interval = setInterval(() => {
-        const increment = current < 60 ? 8 : current < 85 ? 4 : current < 95 ? 1.5 : 0.5;
-        current = Math.min(current + increment, 98);
-        setProgress(current);
-        if (current >= 98) {
-          clearInterval(interval);
-          setTimeout(() => { setProgress(100); setUploading(false); resolve(); }, 400);
-        }
-      }, 150);
-    });
-
   const handleUpload = async () => {
     if (!file) return;
     setUploadError("");
+    setFormatError(false);
+    setSizeError(false);
+    setUploading(true);
+    setProgress(10);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      // 1. Simuler la progression visuelle
-      const progressPromise = simulateProgress();
+      // 1. Préparer l'envoi vers l'API
+      setProgress(35);
 
       // 2. Upload du document
       const doc = await uploadDocument(formData).unwrap();
 
-      await progressPromise;
+      setProgress(75);
 
       // 3. Créer le job OCR sur le document uploadé
       const job = await createJob({ document_id: doc.id }).unwrap();
+      setProgress(100);
 
       // 4. Marquer l'étape comme complète dans le stepper
       completeStep(0);
@@ -266,6 +280,7 @@ export default function Upload() {
 
       // 5. Naviguer vers l'éditeur en passant le job_id et doc_id
       setTimeout(() => {
+        setUploading(false);
         setFile(null);
         setProgress(0);
         navigate(ROUTES.EDITOR, {
@@ -281,12 +296,6 @@ export default function Upload() {
         err?.data?.detail ?? "Erreur lors de l'upload. Vérifiez votre connexion."
       );
     }
-  };
-
-  // Skip avec fakedata — garde la compatibilité
-  const handleFakeUpload = () => {
-    completeStep(0);
-    navigate(ROUTES.EDITOR);
   };
 
   const progressColor = progress === 100 ? colors.green : progress > 60 ? colors.blue : colors.blueMuted;
@@ -320,6 +329,13 @@ export default function Upload() {
             </Alert>
           )}
 
+          {formatError && (
+            <Alert severity="error" icon={<WarningAmberIcon />} onClose={() => setFormatError(false)}
+              sx={{ mb: 2, bgcolor: `${colors.red}18`, color: colors.textWhite, border: `1px solid ${colors.red}` }}>
+              Format non supporté. Formats acceptés : <strong>{ACCEPTED}</strong>
+            </Alert>
+          )}
+
           {uploadError && (
             <Alert severity="error" onClose={() => setUploadError("")}
               sx={{ mb: 2, bgcolor: `${colors.red}18`, color: colors.textWhite, border: `1px solid ${colors.red}` }}>
@@ -334,7 +350,7 @@ export default function Upload() {
             onDrop={handleDrop}
             onClick={() => !uploading && inputRef.current?.click()}
             sx={{
-              border:     `2px dashed ${sizeError ? colors.red : dragging ? colors.blue : colors.blueButton}`,
+              border:     `2px dashed ${sizeError || formatError ? colors.red : dragging ? colors.blue : colors.blueButton}`,
               borderRadius: 2, p: { xs: 4, md: 6 }, textAlign: "center",
               cursor:     uploading ? "not-allowed" : "pointer",
               transition: "all 0.2s",
@@ -356,7 +372,7 @@ export default function Upload() {
                   <Typography color={colors.textWhite} fontWeight="medium">{file.name}</Typography>
                   {!uploading && (
                     <IconButton size="small"
-                      onClick={(e) => { e.stopPropagation(); setFile(null); setSizeError(false); setProgress(0); reset(); }}
+                      onClick={(e) => { e.stopPropagation(); setFile(null); setSizeError(false); setFormatError(false); setProgress(0); reset(); }}
                       sx={{ color: colors.textMuted, ml: 0.5 }}>
                       <CloseIcon fontSize="small" />
                     </IconButton>
@@ -408,11 +424,6 @@ export default function Upload() {
 
           {/* Actions */}
           <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3, alignItems: "center" }}>
-            <Button variant="outlined" onClick={handleFakeUpload} disabled={uploading}
-              sx={{ borderColor: colors.blueButton, color: colors.textMuted, fontSize: 12 }}>
-              Skip with fake data
-            </Button>
-
             {file && !uploading && (
               <Button variant="outlined" startIcon={<VerifiedIcon />} onClick={() => setVerifyOpen(true)}
                 sx={{ borderColor: "#a78bfa55", color: "#a78bfa", fontWeight: 600, fontSize: 13, px: 2.5 }}>

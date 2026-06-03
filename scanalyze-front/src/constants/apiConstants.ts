@@ -12,13 +12,17 @@ export const API_ENDPOINTS = {
  
   // Documents
   DOCUMENTS:        "/documents/",
-  MY_DOCUMENTS:     "/documents/me",
+  MY_DOCUMENTS:     "/documents/owned",
   DOCUMENT_BY_ID:   (id: string) => `/documents/${id}`,
+  DOCUMENT_DOWNLOAD_URL: (id: string) => `/documents/${id}/download-url`,
   UPLOAD_DOCUMENT:  "/documents/upload",
  
   // Jobs
   JOBS:      "/jobs/",
   JOB_BY_ID: (id: string) => `/jobs/${id}`,
+
+  // Results
+  RESULTS_HISTORY: "/results/history",
  
   // Admin
   ADMIN_USERS:      "/admin/users",

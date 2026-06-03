@@ -1,5 +1,6 @@
 // src/services/documentsApi.ts
 import { baseApi } from './api';
+import { API_ENDPOINTS } from '../constants/apiConstants';
 import type { Document } from '../models/documentModels';
 
 export const documentsApi = baseApi.injectEndpoints({
@@ -14,9 +15,9 @@ export const documentsApi = baseApi.injectEndpoints({
           : ['Document'],
     }),
 
-    // GET /documents/me  → docs de l'utilisateur connecté
+    // GET /documents/owned  → docs de l'utilisateur connecté
     getMyDocuments: builder.query<Document[], void>({
-      query: () => '/documents/me',
+      query: () => API_ENDPOINTS.MY_DOCUMENTS,
       providesTags: ['Document'],
     }),
 
@@ -24,6 +25,10 @@ export const documentsApi = baseApi.injectEndpoints({
     getDocumentById: builder.query<Document, string>({
       query: (id) => `/documents/${id}`,
       providesTags: (_, __, id) => [{ type: 'Document', id }],
+    }),
+
+    getDocumentDownloadUrl: builder.query<{ url: string }, string>({
+      query: (id) => API_ENDPOINTS.DOCUMENT_DOWNLOAD_URL(id),
     }),
 
     // POST /documents/upload  → multipart/form-data
@@ -53,6 +58,7 @@ export const {
   useGetAllDocumentsQuery,
   useGetMyDocumentsQuery,
   useGetDocumentByIdQuery,
+  useLazyGetDocumentDownloadUrlQuery,
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
 } = documentsApi;

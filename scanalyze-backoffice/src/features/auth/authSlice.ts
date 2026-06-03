@@ -8,7 +8,7 @@ interface AuthState {
   refreshToken:    string | null;
   isAuthenticated: boolean;
   role:            "admin" | "user" | null;
-  user:            { role: "admin" | "user" } | null; // ← pour PrivateRoute
+  user:            { role: "admin" | "user" } | null;
 }
 
 function parseToken(token: string | null): { role: "admin" | "user" | null } {
@@ -31,7 +31,7 @@ const authSlice = createSlice({
     refreshToken:    localStorage.getItem("refresh_token"),
     isAuthenticated: !!storedToken,
     role:            parsedRole,
-    user:            parsedRole ? { role: parsedRole } : null, // ← synchronisé au démarrage
+    user:            parsedRole ? { role: parsedRole } : null,
   } as AuthState,
 
   reducers: {
@@ -47,7 +47,7 @@ const authSlice = createSlice({
   },
 
   extraReducers: (builder) => {
-    // Login fulfilled
+    // ✅ Login fulfilled — inchangé
     builder.addMatcher(
       authApi.endpoints.login.matchFulfilled,
       (state, { payload }) => {
@@ -62,25 +62,15 @@ const authSlice = createSlice({
       }
     );
 
-    // Register fulfilled
-    builder.addMatcher(
-      authApi.endpoints.register.matchFulfilled,
-      (state, { payload }) => {
-        const role            = parseToken(payload.access_token).role;
-        state.accessToken     = payload.access_token;
-        state.isAuthenticated = true;
-        state.role            = role;
-        state.user            = role ? { role } : null;
-        localStorage.setItem("access_token", payload.access_token);
-      }
-    );
+    // ✅ CORRIGÉ : register ne touche plus au state auth du tout
+    // Le backend ne retourne pas de token, et l'utilisateur doit
+    // vérifier son email avant de pouvoir se connecter
   },
 });
 
 export const { logout } = authSlice.actions;
 export default authSlice.reducer;
 
-// ── Selectors ──────────────────────────────────────────────────────
 export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
 export const selectRole            = (state: RootState) => state.auth.role;
 export const selectAccessToken     = (state: RootState) => state.auth.accessToken;

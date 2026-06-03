@@ -1,49 +1,51 @@
 // src/services/authApi.ts
 import { baseApi } from './api';
-import { API_ENDPOINTS } from '../constants/apiConstants'; // ← ajouter
+import { API_ENDPOINTS } from '../constants/apiConstants';
 import type {
   LoginRequest, LoginResponse,
   RegisterRequest, RegisterResponse,
   ForgotPasswordRequest, ChangePasswordRequest,
 } from '../models/authModels';
-
+ 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-
+ 
+    // POST /auth/token — JSON { login, password }
     login: builder.mutation<LoginResponse, LoginRequest>({
       query: (credentials) => ({
-        url: API_ENDPOINTS.LOGIN,           // ← au lieu de '/auth/token' hardcodé
+        url:    API_ENDPOINTS.LOGIN,
         method: 'POST',
-        body: credentials,
+        body:   credentials, // { login, password } en JSON
       }),
     }),
-
+ 
     register: builder.mutation<RegisterResponse, RegisterRequest>({
       query: (body) => ({
-        url: API_ENDPOINTS.REGISTER,        // ← au lieu de '/auth/register'
+        url:    API_ENDPOINTS.REGISTER,
         method: 'POST',
         body,
       }),
     }),
-
+ 
     forgotPassword: builder.mutation<void, ForgotPasswordRequest>({
       query: (body) => ({
-        url: API_ENDPOINTS.FORGOT_PASSWORD, // ← au lieu de '/auth/forgot-password'
+        url:    API_ENDPOINTS.FORGOT_PASSWORD,
         method: 'POST',
         body,
       }),
     }),
-
+ 
     changePassword: builder.mutation<void, ChangePasswordRequest>({
       query: (body) => ({
-        url: API_ENDPOINTS.CHANGE_PASSWORD, // ← au lieu de '/auth/change-password'
+        url:    API_ENDPOINTS.CHANGE_PASSWORD,
         method: 'POST',
         body,
       }),
     }),
+ 
   }),
 });
-
+ 
 export const {
   useLoginMutation,
   useRegisterMutation,

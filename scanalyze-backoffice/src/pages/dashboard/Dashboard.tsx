@@ -53,23 +53,29 @@ const categories = [
 
 // ── Helpers UI ────────────────────────────────────────────────────────
 const statusChipSx = (status: string) => {
+  if (status === "uploaded")   return { bgcolor: `${colors.blue}22`,  color: colors.blue  };
   if (status === "pending")    return { bgcolor: `${colors.blue}22`,  color: colors.blue  };
   if (status === "processing") return { bgcolor: `${colors.amber}22`, color: colors.amber };
+  if (status === "failed")     return { bgcolor: `${colors.red}22`,   color: colors.red   };
   if (status === "error")      return { bgcolor: `${colors.red}22`,   color: colors.red   };
   if (status === "done")       return { bgcolor: `${colors.green}22`, color: colors.green };
   return { bgcolor: colors.bgHover, color: colors.textMuted };
 };
 
 const StatusIcon = ({ status }: { status: string }) => {
+  if (status === "uploaded")   return <UploadFileIcon   sx={{ fontSize: 14 }} />;
   if (status === "pending")    return <UploadFileIcon   sx={{ fontSize: 14 }} />;
   if (status === "processing") return <HourglassTopIcon sx={{ fontSize: 14 }} />;
+  if (status === "failed")     return <ErrorIcon        sx={{ fontSize: 14 }} />;
   if (status === "error")      return <ErrorIcon        sx={{ fontSize: 14 }} />;
   return null;
 };
 
 const statusLabel: Record<string, string> = {
+  uploaded:   "Uploadé",
   pending:    "En attente",
   processing: "En cours",
+  failed:     "Échoué",
   done:       "Terminé",
   error:      "Échoué",
 };
@@ -81,12 +87,35 @@ const typeColor = (type: string) => {
   return { bgcolor: colors.bgHover, color: colors.textMuted };
 };
 
+const formatUploadDate = (doc: Document) => {
+  const value = doc.uploaded_at ?? doc.created_at;
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const getDocumentType = (doc: Document) => doc.doc_type ?? doc.file_type;
+
+const getDocumentCategory = (doc: Document) => {
+  const type = doc.doc_type;
+  return type === "invoice" || type === "cv" || type === "contract" ? type : "other";
+};
+
 // ── Mapping DashboardStats → KPI cards ───────────────────────────────
 function buildKpis(stats: DashboardStats) {
   return [
     {
       title: "TOTAL DOCUMENTS TRAITÉS",
-      value: stats.total_documents ?? "—",
+      value: stats.documents_processed ?? stats.total_documents ?? "—",
       trend: "",
       up:    true,
       color: colors.blue,
@@ -111,7 +140,7 @@ function buildKpis(stats: DashboardStats) {
     {
       // Adapte ce champ selon la vraie réponse de ton API
       title: "DOCS EN ERREUR",
-      value: stats.total_errors ?? "—",
+      value: stats.total_errors ?? stats.low_confidence_documents ?? "—",
       trend: "",
       up:    false,
       color: colors.red,
@@ -159,7 +188,7 @@ export default function Dashboard() {
   const filteredDocs =
     activeCategory === "all"
       ? documents
-      : documents.filter((d) => d.doc_type === activeCategory);
+      : documents.filter((d) => getDocumentCategory(d) === activeCategory);
 
   const totalPages    = Math.ceil(filteredDocs.length / ROWS_PER_PAGE);
   const paginatedDocs = filteredDocs.slice(
@@ -171,7 +200,7 @@ export default function Dashboard() {
   const countByCategory = (value: string) =>
     value === "all"
       ? documents.length
-      : documents.filter((d) => d.doc_type === value).length;
+      : documents.filter((d) => getDocumentCategory(d) === value).length;
 
   const handleCategoryChange = (value: string) => {
     setActiveCategory(value);
@@ -375,14 +404,14 @@ export default function Dashboard() {
                           </TableCell>
                           {activeCategory === "all" && (
                             <TableCell sx={tableCellSx}>
-                              {doc.doc_type ? (
+                              {getDocumentType(doc) ? (
                                 <Chip
-                                  label={doc.doc_type}
+                                  label={getDocumentType(doc)}
                                   size="small"
                                   sx={{
                                     fontSize: 11, fontWeight: 600,
                                     textTransform: "capitalize",
-                                    ...typeColor(doc.doc_type),
+                                    ...typeColor(getDocumentType(doc)),
                                   }}
                                 />
                               ) : (
@@ -393,7 +422,7 @@ export default function Dashboard() {
                             </TableCell>
                           )}
                           <TableCell sx={tableCellSx}>
-                            {new Date(doc.created_at).toLocaleDateString("fr-FR")}
+                            {formatUploadDate(doc)}
                           </TableCell>
                           <TableCell sx={tableCellSx}>
                             <Chip
@@ -510,7 +539,7 @@ export default function Dashboard() {
               {[
                 { label: "ID",          value: previewDoc.id          },
                 { label: "Propriétaire", value: previewDoc.owner_id   },
-                { label: "Date upload", value: new Date(previewDoc.created_at).toLocaleDateString("fr-FR") },
+                { label: "Date upload", value: formatUploadDate(previewDoc) },
               ].map(({ label, value }) => (
                 <Box
                   key={label}
@@ -545,14 +574,14 @@ export default function Dashboard() {
                 >
                   Type
                 </Typography>
-                {previewDoc.doc_type ? (
+                {getDocumentType(previewDoc) ? (
                   <Chip
-                    label={previewDoc.doc_type}
+                    label={getDocumentType(previewDoc)}
                     size="small"
                     sx={{
                       fontSize: 11, fontWeight: 600,
                       textTransform: "capitalize",
-                      ...typeColor(previewDoc.doc_type),
+                      ...typeColor(getDocumentType(previewDoc)),
                     }}
                   />
                 ) : (

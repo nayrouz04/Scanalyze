@@ -1,11 +1,12 @@
-import type { ReactNode }        from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";  // ✅ useLocation ajouté
-import { useAppSelector }        from "../app/hooks";
-import { useStepper }            from "../features/stepper/useStepper";
-import { STEPS, type StepId }    from "../features/stepper/StepperContext";
-import { ROUTES }                from "../constants/routeConstants";
+// src/routes/PrivateRoute.tsx  (frontoffice)
+import type { ReactNode }                    from "react";
+import { Navigate, Outlet, useLocation }     from "react-router-dom";
+import { useAppSelector }                    from "../app/hooks";
+import { useStepper }                        from "../features/stepper/useStepper";
+import { STEPS, type StepId }               from "../features/stepper/StepperContext";
+import { ROUTES }                            from "../constants/routeConstants";
 
-// ─── PrivateRoute ────────────────────────────────────────────────────────────
+// ─── PrivateRoute ─────────────────────────────────────────────────
 
 type PrivateRouteProps = {
   children?:  ReactNode;
@@ -14,13 +15,11 @@ type PrivateRouteProps = {
 };
 
 /**
- * PrivateRoute — protects routes based on authentication and role.
- *
- * Behaviour:
- *   - Not authenticated          → redirects to /login
- *   - adminOnly + not admin      → redirects to /
- *   - userOnly  + is admin       → redirects to /
- *   - Otherwise                  → renders children or <Outlet />
+ * Protects routes based on authentication and role.
+ *   - Not authenticated       → /login
+ *   - adminOnly + not admin   → /
+ *   - userOnly  + is admin    → /
+ *   - Otherwise               → children ou <Outlet />
  */
 export default function PrivateRoute({
   children,
@@ -36,7 +35,7 @@ export default function PrivateRoute({
   return <>{children ?? <Outlet />}</>;
 }
 
-// ─── ProtectedStep ───────────────────────────────────────────────────────────
+// ─── ProtectedStep ────────────────────────────────────────────────
 
 type ProtectedStepProps = {
   stepId:   StepId;
@@ -44,21 +43,16 @@ type ProtectedStepProps = {
 };
 
 /**
- * ProtectedStep — protects stepper-dependent routes.
- *
- * Checks if the required pipeline step is unlocked.
- * Exception : si la navigation vient de l'historique (state.fromHistory === true),
- * le guard est bypassé — l'utilisateur accède directement à la page de vérification
- * sans avoir à compléter les étapes précédentes du pipeline.
- *
- * If the step is locked → redirects to /upload (first step of the pipeline).
+ * Protects stepper-dependent routes.
+ * Exception : si navigation depuis l'historique (state.fromHistory === true)
+ * → bypass du guard, accès direct sans compléter les étapes précédentes.
  */
 export function ProtectedStep({ stepId, children }: ProtectedStepProps) {
   const { canAccessStep } = useStepper();
-  const location          = useLocation(); // ✅ NOUVEAU
+  const location          = useLocation();
   const stepIndex         = STEPS.indexOf(stepId);
 
-  // ✅ NOUVEAU : bypass du guard si on vient de l'historique
+  // Bypass si on vient de l'historique
   const fromHistory: boolean = location.state?.fromHistory === true;
   if (fromHistory) return <>{children}</>;
 

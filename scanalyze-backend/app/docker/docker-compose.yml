@@ -46,7 +46,7 @@ services:
       celery -A app.workers.celery_app worker
       --loglevel=${CELERY_LOG_LEVEL:-info}
       --concurrency=${CELERY_CONCURRENCY:-2}
-      --queues=pipeline,default
+      --queues=celery,pipeline,default
     ports: []          # workers don't expose HTTP
     healthcheck:
       test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]

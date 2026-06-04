@@ -1,3 +1,4 @@
+// src/components/common/Topbar.tsx
 import { useState } from "react";
 import {
   AppBar, Toolbar, Typography, Box, Avatar, IconButton, Tooltip,
@@ -11,12 +12,11 @@ import LockIcon      from "@mui/icons-material/Lock";
 import PhoneIcon     from "@mui/icons-material/Phone";
 import Visibility    from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useSelector }    from "react-redux";
-import { useAppDispatch } from "@app/hooks";
+import { useLocation, useNavigate }          from "react-router-dom";
+import { useAppDispatch, useAppSelector }    from "@app/hooks";   // ← useAppSelector au lieu de useSelector
 import { PAGE_TITLES, DEFAULT_TITLE, ROUTES } from "@constants";
-import { selectCurrentUser, logout } from "@features/auth/authSlice";
-import { colors, dialogSx, btnPrimarySx } from "@theme";
+import { selectCurrentUser, logout }         from "@features/auth/authSlice";
+import { colors, dialogSx, btnPrimarySx }   from "@theme";
  
 // ─── Types ─────────────────────────────────────────────────────────────────
  
@@ -45,9 +45,11 @@ const logoutBtnSx = {
  
 export default function Topbar() {
   const location = useLocation();
-  const navigate  = useNavigate();
-  const dispatch  = useAppDispatch();
-  const user      = useSelector(selectCurrentUser);
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+ 
+  // ← useAppSelector (typé) au lieu de useSelector (générique)
+  const user = useAppSelector(selectCurrentUser);
  
   const title    = PAGE_TITLES[location.pathname] || DEFAULT_TITLE;
   const userName = user?.name ?? "Utilisateur";
@@ -124,7 +126,7 @@ export default function Topbar() {
  
     try {
       setLoading(true);
-      // TODO : remplacer par votre appel RTK Query / axios
+      // TODO : brancher useChangePasswordMutation ici
       await new Promise((res) => setTimeout(res, 1000));
  
       const labels: Record<TabValue, string> = {
@@ -183,7 +185,6 @@ export default function Topbar() {
           {errorMsg   && <Alert severity="error"   sx={{ mb: 2 }}>{errorMsg}</Alert>}
           {successMsg && <Alert severity="success" sx={{ mb: 2 }}>{successMsg}</Alert>}
  
-          {/* ── Email ── */}
           {activeTab === "email" && (
             <TextField
               label="Nouvel email" type="email" value={form.email}
@@ -192,7 +193,6 @@ export default function Topbar() {
             />
           )}
  
-          {/* ── Mot de passe ── */}
           {activeTab === "password" && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <TextField
@@ -219,7 +219,6 @@ export default function Topbar() {
             </Box>
           )}
  
-          {/* ── Téléphone ── */}
           {activeTab === "phone" && (
             <TextField
               label="Nouveau numéro de téléphone" type="tel" value={form.phone}

@@ -74,5 +74,22 @@ class ResultResponse(BaseModel):
     exported_at: datetime
     
     model_config = {"from_attributes": True}
+
+class ProcessingHistoryResponse(BaseModel):
+    id: uuid.UUID
+    job_id: uuid.UUID
+    document_id: uuid.UUID
+    source_document: str
+    json_filename: str
+    doc_type: str | None
+    processed_at: datetime | None
+    processing_time_ms: int | None
+    confidence: float | None
+    fields_extracted: int
+    language: str | None = "fr"
+    size: str | None
+    status: str
+    exported_data: str | None = None
+
     
     

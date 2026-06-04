@@ -1,20 +1,18 @@
 // Editor — side-by-side document editor with live JSON preview
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import {
   Box, Typography, TextField, Button,
   CircularProgress, Alert, Paper, Divider,
 } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CircleIcon       from "@mui/icons-material/Circle";
-import { useNavigate }  from "react-router-dom";
-import { useGetResultsQuery } from "@services";
+import { useLocation, useNavigate }  from "react-router-dom";
+import { useGetExtractedFieldsQuery, useGetJobByIdQuery } from "@services";
+
 import { colors }             from "@theme";
 import { ROUTES }             from "@constants";
 import { useStepper }         from "@features/stepper";
 import PipelineStepper        from "@components/common/PipelineStepper";
-import fakeDoc from "../../assets/fakeData/editor-document.json";
- 
-const USE_FAKE_DATA = true;
  
 // ── JSON syntax highlight palette ───────────────────────────────────────────
 const JSON_COLORS = {
@@ -81,29 +79,54 @@ function renderJsonSyntax(obj: any): JSX.Element {
  
 export default function Editor() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { completeStep } = useStepper();
- 
-  const { data, isLoading: liveLoading, isError: liveError } =
-    useGetResultsQuery(undefined, { skip: USE_FAKE_DATA });
- 
-  const isLoading = USE_FAKE_DATA ? false : liveLoading;
-  const isError   = USE_FAKE_DATA ? false : liveError;
- 
-  const lastDoc       = USE_FAKE_DATA ? fakeDoc : data?.[data.length - 1];
-  const extractedData = lastDoc?.extracted_data ?? {};
- 
-  const [fields, setFields] = useState<Record<string, any>>({});
- 
-  useEffect(() => {
-    if (extractedData) setFields(extractedData);
-  }, [lastDoc]);
- 
-  const previewJson = lastDoc
+
+  const routeState = (location.state ?? {}) as {
+    document_id?: string;
+    documentId?: string;
+    job_id?: string;
+    jobId?: string;
+  };
+  const documentId = routeState.document_id ?? routeState.documentId;
+  const jobId = routeState.job_id ?? routeState.jobId;
+
+  const {
+    data: job,
+    isLoading: jobLoading,
+    isError: jobError,
+  } = useGetJobByIdQuery(jobId ?? "", {
+    skip: !jobId,
+    pollingInterval: jobId ? 3000 : 0,
+  });
+
+  const isJobDone = job?.status === "done";
+  const isJobFailed = job?.status === "failed" || job?.status === "error";
+
+  const {
+    data: extractedFields = [],
+    isLoading: fieldsLoading,
+    isError: fieldsError,
+  } = useGetExtractedFieldsQuery(jobId ?? "", {
+    skip: !jobId || !isJobDone,
+  });
+
+  const fields = useMemo<Record<string, any>>(() => {
+    return extractedFields.reduce<Record<string, any>>((acc, field) => {
+      acc[field.field_name] = field.normalized_value ?? field.raw_value ?? field.ocr_value ?? "";
+      return acc;
+    }, {});
+  }, [extractedFields]);
+
+  const isLoading = jobLoading || (isJobDone && fieldsLoading);
+  const isError = jobError || fieldsError;
+
+  const previewJson = jobId
     ? {
-        document_id:       lastDoc.id ?? lastDoc.document_id,
+        document_id:       documentId ?? job?.document_id ?? null,
+        job_id:            jobId,
         extracted_data:    fields,
-        validation_status: lastDoc.validation_status ?? "pending",
-        last_edited_by:    "user_admin",
+        validation_status: isJobDone ? "ready_for_review" : job?.status ?? "pending",
       }
     : null;
  
@@ -139,7 +162,9 @@ export default function Editor() {
  
   const handleNext = () => {
     completeStep(1);
-    navigate(ROUTES.VERIFICATION);
+    navigate(ROUTES.VERIFICATION, {
+      state: { document_id: documentId ?? job?.document_id, job_id: jobId },
+    });
   };
  
   return (
@@ -155,8 +180,18 @@ export default function Editor() {
  
       {isLoading && <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}><CircularProgress /></Box>}
       {isError   && <Alert severity="error">Erreur lors du chargement du document.</Alert>}
+      {jobId && !isLoading && !isError && !isJobDone && !isJobFailed && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Traitement en cours ({job?.status ?? "queued"}). Les champs extraits s'afficheront automatiquement dès que l'OCR et l'analyse seront terminés.
+        </Alert>
+      )}
+      {isJobFailed && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Le traitement du document a échoué{job?.error_message ? ` : ${job.error_message}` : "."}
+        </Alert>
+      )}
  
-      {!isLoading && !isError && lastDoc && (
+      {!isLoading && !isError && jobId && isJobDone && (
         <Box sx={{ display: "flex", gap: 3, flexDirection: { xs: "column", md: "row" } }}>
  
           {/* Left — Extracted Fields */}
@@ -207,21 +242,21 @@ export default function Editor() {
               {previewJson && renderJsonSyntax(previewJson)}
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 2 }}>
-              <CircleIcon sx={{ fontSize: 10, color: USE_FAKE_DATA ? colors.amber : colors.green }} />
+              <CircleIcon sx={{ fontSize: 10, color: colors.green }} />
               <Typography variant="caption" color={colors.textMuted}>
-                {USE_FAKE_DATA ? "Fake data mode" : "Connected to API"}
+                Connected to API
               </Typography>
             </Box>
           </Paper>
         </Box>
       )}
  
-      {!isLoading && !isError && !lastDoc && (
+      {!isLoading && !isError && !jobId && (
         <Alert severity="info">Aucun document disponible. Veuillez d'abord uploader un fichier.</Alert>
       )}
  
       {/* Bottom bar — Stepper + Next */}
-      {!isLoading && !isError && lastDoc && (
+      {!isLoading && !isError && jobId && isJobDone && (
         <Box sx={{
           position: "fixed", bottom: 0, left: 260, right: 0,
           bgcolor: colors.bgDark, borderTop: `1px solid ${colors.border}`,

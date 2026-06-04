@@ -137,7 +137,6 @@ class DocumentService:
 
         #________ 5 Count pages _____________
         pages = _count_pages(content, ext)
-        
         #________ 6 Calculate doc_nmbr _________
         #Count the number of documents already uploaded by this user
         result = await self.db.execute(
@@ -184,26 +183,66 @@ class DocumentService:
     
     async def get_document_by_id(self, document_id: uuid.UUID, current_user: User) -> Document:
         """Admin — return a specific document by ID"""
-        if current_user.role != "admin":
-            raise DocumentError("Only admins can access this endpoint", status_code=403) 
         result = await self.db.execute(
-            select(Document).where(Document.id == document_id)
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.is_deleted == False)
         )
         document = result.scalar_one_or_none()
         if not document:
             raise DocumentError("Document not found", status_code=404)
+
+        if current_user.role != "admin" and document.user_id != current_user.id:
+            raise DocumentError("Only the document owner can access this document", status_code=403)
+
         return document
-    
-    async def delete_document(self, document_id: uuid.UUID, current_user: User) -> None: 
+
+    async def get_document_for_download(self, document_id: uuid.UUID, current_user: User) -> Document:
+        """Return a document if the current user is allowed to access its file."""
+        result = await self.db.execute(
+            select(Document)
+            .where(Document.id == document_id)
+            .where(Document.is_deleted == False)
+        )
+        document = result.scalar_one_or_none()
+        if not document:
+            raise DocumentError("Document not found", status_code=404)
+
+        if current_user.role != "admin" and document.user_id != current_user.id:
+            raise DocumentError("Only the document owner can access this file", status_code=403)
+
+        return document
+
+    def create_download_url(self, document: Document, expires_in: int = 300) -> str:
+        """Create a short-lived URL for the original file stored in MinIO."""
+        safe_name = document.original_filename.replace('"', "") or document.filename
+        try:
+            s3 = get_s3_client()
+            return s3.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": settings.S3_BUCKET_UPLOADS,
+                    "Key": document.minio_path,
+                    "ResponseContentDisposition": f'inline; filename="{safe_name}"',
+                },
+                ExpiresIn=expires_in,
+            )
+        except (BotoCoreError, ClientError) as e:
+            raise DocumentError(
+                f"Error during download URL generation: {str(e)}",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+    async def delete_document(self, document_id: uuid.UUID, current_user: User) -> None:
         """Admin — delete a document from DB and MinIO."""
         document = await self.get_document_by_id(document_id, current_user)
         
         #verify if document is already deleted 
         if document.is_deleted:
             raise DocumentError("Document is already deleted", 400)
-        
+
         # Delete from MinIO
-        try: 
+        try:
             s3 = get_s3_client()
             s3.delete_object(
                 Bucket=settings.S3_BUCKET_UPLOADS,

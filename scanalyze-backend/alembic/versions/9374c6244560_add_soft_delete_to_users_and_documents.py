@@ -25,6 +25,7 @@ def upgrade() -> None:
     op.add_column('documents', sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
     op.add_column('documents', sa.Column('deleted_by', sa.UUID(), nullable=True))
     
+
     op.create_foreign_key(None, 'documents', 'users', ['deleted_by'], ['id'])
     op.add_column('users', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('users', sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
@@ -37,6 +38,7 @@ def downgrade() -> None:
     op.drop_column('users', 'deleted_at')
     op.drop_column('users', 'is_deleted')
     op.drop_constraint(None, 'documents', type_='foreignkey')
+
     op.drop_column('documents', 'deleted_by')
     op.drop_column('documents', 'deleted_at')
     op.drop_column('documents', 'is_deleted')

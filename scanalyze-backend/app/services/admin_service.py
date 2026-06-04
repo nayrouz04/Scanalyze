@@ -258,11 +258,12 @@ class AdminService:
         #______ most processed document type _________
         #Most frequent doc_type detected by the pipeline
         doc_type_result = await self.db.execute(
-        select(Document.doc_type, func.count(Document.id).label("count"))
+        select(Document.doc_type_id, func.count(Document.id).label("count"))
             .where(
                 Document.is_deleted == False,    
-                Document.doc_type.isnot(None)    # only documents with detected type
-            ).group_by(Document.doc_type)
+                Document.doc_type_id.isnot(None)    # only documents with detected type
+            ).group_by(Document.doc_type_id)
+
             # group by doc_type → count per type
             .order_by(func.count(Document.id).desc())
             # order by count descending → most frequent first

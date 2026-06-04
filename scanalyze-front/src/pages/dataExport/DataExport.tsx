@@ -1,29 +1,41 @@
 // DataExport — allows users to export all processed workspace data as a JSON file
 import { useState } from "react";
-import { Box, Typography, Button, CircularProgress } from "@mui/material";
+import { useLocation } from "react-router-dom";
+import { Alert, Box, Typography, Button, CircularProgress } from "@mui/material";
 import DownloadIcon   from "@mui/icons-material/Download";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { colors, btnPrimarySx } from "@theme";
 import PipelineStepper from "@components/common/PipelineStepper";
+import { useExportJobResultsMutation, useExportJobResultsPdfMutation } from "@services";
  
 export default function DataExport() {
+  const location = useLocation();
+  const routeState = location.state as { job_id?: string; jobId?: string } | null;
+  const jobId = routeState?.job_id ?? routeState?.jobId ?? null;
   const [lastExported, setLastExported] = useState<string | null>(null);
-  const [isExporting,  setIsExporting]  = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportJobResults, { isLoading: isExporting }] = useExportJobResultsMutation();
+  const [exportJobResultsPdf, { isLoading: isExportingPdf }] = useExportJobResultsPdfMutation();
  
   const handleExport = async () => {
-    setIsExporting(true);
+    if (!jobId) {
+      setExportError("Aucun job a exporter. Lancez l'export depuis l'etape Verification.");
+      return;
+    }
+
+    setExportError(null);
     try {
-      // TODO: replace with real RTK Query mutation when backend endpoint is ready
-      await new Promise((res) => setTimeout(res, 1000));
+      const exportedJson = await exportJobResults(jobId).unwrap();
       const now = new Date();
       const blob = new Blob(
-        [JSON.stringify({ exported_at: now.toISOString() })],
+        [exportedJson],
         { type: "application/json" },
       );
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href     = url;
-      a.download = `scanalyze-export-${now.toISOString().slice(0, 10)}.json`;
+      a.download = `scanalyze-export-${jobId}-${now.toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       setLastExported(
@@ -32,8 +44,35 @@ export default function DataExport() {
           hour: "2-digit", minute: "2-digit",
         }),
       );
-    } finally {
-      setIsExporting(false);
+    } catch {
+      setExportError("Impossible d'exporter les resultats. Verifiez que le job est termine et approuve.");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!jobId) {
+      setExportError("Aucun job a exporter. Lancez l'export depuis l'etape Verification.");
+      return;
+    }
+
+    setExportError(null);
+    try {
+      const pdfBlob = await exportJobResultsPdf(jobId).unwrap();
+      const now = new Date();
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `scanalyze-export-${jobId}-${now.toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setLastExported(
+        now.toLocaleDateString("fr-FR", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        }),
+      );
+    } catch {
+      setExportError("Impossible d'exporter le PDF. Verifiez que le job est termine et approuve.");
     }
   };
  
@@ -69,24 +108,56 @@ export default function DataExport() {
           <Typography variant="body2" color={colors.textLight} sx={{ mb: "1.25rem" }}>
             Téléchargez immédiatement toutes les données traitées de votre workspace.
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={
-              isExporting
-                ? <CircularProgress size={14} sx={{ color: "white" }} />
-                : <DownloadIcon sx={{ fontSize: 16 }} />
-            }
-            onClick={handleExport}
-            disabled={isExporting}
-            sx={{
-              ...btnPrimarySx,
-              "&:disabled": { opacity: 0.6 },
-              fontSize: "0.875rem",
-              px: 2.5,
-            }}
-          >
-            {isExporting ? "Export en cours..." : "Export JSON"}
-          </Button>
+          {!jobId && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Aucun job selectionne. Retournez a la verification puis cliquez sur Approve.
+            </Alert>
+          )}
+          {exportError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {exportError}
+            </Alert>
+          )}
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              startIcon={
+                isExporting
+                  ? <CircularProgress size={14} sx={{ color: "white" }} />
+                  : <DownloadIcon sx={{ fontSize: 16 }} />
+              }
+              onClick={handleExport}
+              disabled={isExporting || isExportingPdf || !jobId}
+              sx={{
+                ...btnPrimarySx,
+                "&:disabled": { opacity: 0.6 },
+                fontSize: "0.875rem",
+                px: 2.5,
+              }}
+            >
+              {isExporting ? "Export en cours..." : "Export JSON"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={
+                isExportingPdf
+                  ? <CircularProgress size={14} sx={{ color: colors.textLight }} />
+                  : <PictureAsPdfIcon sx={{ fontSize: 16 }} />
+              }
+              onClick={handleExportPdf}
+              disabled={isExporting || isExportingPdf || !jobId}
+              sx={{
+                color: colors.textLight,
+                borderColor: colors.borderExport,
+                textTransform: "none",
+                fontWeight: 700,
+                "&:hover": { borderColor: colors.blue, bgcolor: `${colors.blue}18` },
+                "&:disabled": { opacity: 0.6 },
+              }}
+            >
+              {isExportingPdf ? "PDF en cours..." : "Export PDF"}
+            </Button>
+          </Box>
         </Box>
  
         {lastExported && (

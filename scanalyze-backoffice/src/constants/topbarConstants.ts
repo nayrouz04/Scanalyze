@@ -1,15 +1,15 @@
-// topbarConstants.ts — titres des pages affichés dans la Topbar du backoffice
+// topbarConstants.ts â€” titres des pages affichÃ©s dans la Topbar du backoffice
 import { ROUTES } from "./routeConstants";
 
-// PAGE_TITLES — associe chaque route à son titre affiché dans la Topbar
+// PAGE_TITLES â€” associe chaque route Ã  son titre affichÃ© dans la Topbar
 export const PAGE_TITLES: Record<string, string> = {
   [ROUTES.HOME]:       "Dashboard",
   [ROUTES.HISTORIQUE]: "Historique",
   [ROUTES.USERS]:      "User Management",
 };
 
-// DEFAULT_TITLE — titre affiché si la route n'a pas de correspondance
+// DEFAULT_TITLE â€” titre affichÃ© si la route n'a pas de correspondance
 export const DEFAULT_TITLE = "Dashboard";
 
-// DEFAULT_USERNAME — nom affiché si aucun utilisateur n'est authentifié
+// DEFAULT_USERNAME â€” nom affichÃ© si aucun utilisateur n'est authentifiÃ©
 export const DEFAULT_USERNAME = "Admin";

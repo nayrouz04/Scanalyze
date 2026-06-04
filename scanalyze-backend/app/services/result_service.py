@@ -1,6 +1,8 @@
 """ 
 app/services/result_service.py - Extracted fields and results business logic
 """
+from dataclasses import field
+from dataclasses import field
 import json
 import logging
 import uuid
@@ -9,6 +11,7 @@ from datetime import datetime, timezone
 import fitz
 from fastapi import status
 from sqlalchemy import func, select
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import ExtractionJob
@@ -17,7 +20,6 @@ from app.models.user import User
 from app.models.document import Document
 
 logger = logging.getLogger(__name__)
-
 
 OCR_FIELD_NAMES = {"ocr_text", "text", "full_text", "document_text"}
 
@@ -73,8 +75,7 @@ def _format_datetime(value: str | None) -> str:
     except ValueError:
         return str(value)
     return parsed.strftime("%Y-%m-%d %H:%M UTC")
-
-
+  
 class ResultError(Exception):
     """Domain-level result error — converted to HTTP response in the router."""
     def __init__(self, message: str, status_code: int = 400):
@@ -271,17 +272,15 @@ class ResultService:
         fields = result.scalars().all()
         
         # Convert fields to a dict for JSON export
-        extracted_data = {}
+
+        exported_data = {}
         for field in fields:
             if field.is_validated:
                 # user corrected the field → export normalized_value
-                extracted_data[field.field_name] = field.normalized_value
+                exported_data[field.field_name] = field.normalized_value
             else:
                 # user skipped or did not process the field → export raw_value
-                extracted_data[field.field_name] = field.raw_value
-
-        for field in fields:
-            extracted_data[field.field_name] = _field_export_value(field)
+                exported_data[field.field_name] = field.raw_value
         
         #calculate the average confidence score
         #retrieve only fields that contain a confidence value (not None)
@@ -303,41 +302,9 @@ class ResultService:
             document.status = "done"
             await self.db.flush()
             
-        export_payload = {
-            "document_id": str(job.document_id),
-            "job_id": str(job.id),
-            "status": job.status,
-            "ocr_engine": job.ocr_engine,
-            "ai_model": job.ai_model,
-            "confidence_score": confidence_score,
-            "duration_ms": job.duration_ms,
-            "processed_at": job.completed_at.isoformat() if job.completed_at else None,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
-            "source_document": document.original_filename if document else None,
-            "file_type": document.file_type if document else None,
-            "fields_count": len(fields),
-            "extracted_data": extracted_data,
-            "fields": [
-                {
-                    "id": str(field.id),
-                    "name": field.field_name,
-                    "label": field.field_label,
-                    "category": field.field_category,
-                    "value": extracted_data.get(field.field_name),
-                    "ocr_value": field.ocr_value,
-                    "raw_value": field.raw_value,
-                    "normalized_value": field.normalized_value,
-                    "confidence": field.confidence,
-                    "is_validated": field.is_validated,
-                    "is_skipped": field.is_skipped,
-                    "page_number": field.page_number,
-                }
-                for field in fields
-            ],
-        }
 
-        # Save to the results table
-        exported_data_str = json.dumps(export_payload, ensure_ascii=False, indent=2)
+        # Save to the results table    
+        exported_data_str = json.dumps(exported_data, ensure_ascii=False, indent=2)
         result_obj = Result(
             document_id=job.document_id,
             job_id=job_id,
@@ -355,9 +322,46 @@ class ResultService:
         job_id: uuid.UUID,
         current_user: User,
     ) -> bytes:
-        """Export the same result payload as a polished PDF report."""
-        exported_data_str = await self.export_results(job_id=job_id, current_user=current_user)
-        payload = json.loads(exported_data_str)
+        """Export a PDF report."""
+        # 1. Retrieve the job, document, and extracted fields
+        job = await self._get_job(job_id, current_user)
+    
+      doc_result = await self.db.execute(
+          select(Document).where(Document.id == job.document_id)
+      )
+      document = doc_result.scalar_one_or_none()
+
+      fields_result = await self.db.execute(
+          select(ExtractedField).where(ExtractedField.job_id == job_id)
+      )
+      fields = fields_result.scalars().all()
+
+      # 2. Calculate the average confidence score
+      confidence_values = [f.confidence for f in fields if f.confidence is not None]
+      confidence_score = sum(confidence_values) / len(confidence_values) if confidence_values else None
+
+      # 3. Build a minimal payload for PDF generation
+      payload = {
+          "source_document": document.original_filename if document else None,
+          "status": job.status,
+          "confidence_score": confidence_score,
+          "fields_count": len(fields),
+          "duration_ms": job.duration_ms,
+          "processed_at": job.completed_at.isoformat() if job.completed_at else None,
+          "exported_at": datetime.now(timezone.utc).isoformat(),
+          "document_id": str(job.document_id),
+          "job_id": str(job.id),
+          "ocr_engine": job.ocr_engine,
+          "fields": [
+              {
+                  "label": f.field_label or f.field_name,
+                  "name": f.field_name,
+                  "confidence": f.confidence,
+                  "value": f.normalized_value if f.is_validated else f.raw_value,
+              }
+              for f in fields
+          ],
+      }
 
         pdf = fitz.open()
         page_width = 595
@@ -524,3 +528,4 @@ class ResultService:
             page = write_wrapped_block(page, field_data.get("value"), size=9)
 
         return pdf.tobytes()
+

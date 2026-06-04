@@ -75,7 +75,6 @@ class ResultResponse(BaseModel):
     
     model_config = {"from_attributes": True}
 
-
 class ProcessingHistoryResponse(BaseModel):
     id: uuid.UUID
     job_id: uuid.UUID
@@ -91,5 +90,6 @@ class ProcessingHistoryResponse(BaseModel):
     size: str | None
     status: str
     exported_data: str | None = None
+
     
     

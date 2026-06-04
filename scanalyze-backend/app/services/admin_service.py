@@ -263,6 +263,7 @@ class AdminService:
                 Document.is_deleted == False,    
                 Document.doc_type_id.isnot(None)    # only documents with detected type
             ).group_by(Document.doc_type_id)
+
             # group by doc_type → count per type
             .order_by(func.count(Document.id).desc())
             # order by count descending → most frequent first

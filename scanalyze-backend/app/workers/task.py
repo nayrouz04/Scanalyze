@@ -11,6 +11,10 @@ from sqlalchemy.orm import joinedload
 
 from app.db.session import get_sync_db
 from app.models.job import ExtractionJob
+
+from app.models.result import ExtractedField, Result  
+from app.models.document import Document             
+from app.models.user import User      
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.workers.celery_app import celery_app
 
@@ -45,6 +49,7 @@ def process_document(self, job_id: str, document_id: str):
             # 2. Start processing
             job.started_at = datetime.now(timezone.utc)
             job.status = "ocr_running"
+            
             if job.document:
                 job.document.status = "processing"
             db.commit()
@@ -99,3 +104,4 @@ def process_document(self, job_id: str, document_id: str):
                 if job.document:
                     job.document.status = "failed"
                 db.commit()
+

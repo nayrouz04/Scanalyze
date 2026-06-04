@@ -137,7 +137,6 @@ class DocumentService:
 
         #________ 5 Count pages _____________
         pages = _count_pages(content, ext)
-
         #________ 6 Calculate doc_nmbr _________
         #Count the number of documents already uploaded by this user
         result = await self.db.execute(
@@ -237,8 +236,8 @@ class DocumentService:
     async def delete_document(self, document_id: uuid.UUID, current_user: User) -> None:
         """Admin — delete a document from DB and MinIO."""
         document = await self.get_document_by_id(document_id, current_user)
-
-        #verify if document is already deleted
+        
+        #verify if document is already deleted 
         if document.is_deleted:
             raise DocumentError("Document is already deleted", 400)
 

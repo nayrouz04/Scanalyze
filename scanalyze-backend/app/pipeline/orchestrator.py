@@ -24,7 +24,6 @@ class PipelineOrchestrator:
     """
     Orchestrates all pipeline stages in order.
     """
-
     def __init__(self):
         # List of all stages in the pipeline, in order
         self.stages: List[Any] = [
@@ -36,7 +35,6 @@ class PipelineOrchestrator:
             len(self.stages),
             ", ".join(stage.__class__.__name__ for stage in self.stages)
         )
-
     async def run(self,
                   job_id: UUID,
                   document_id: UUID,
@@ -49,7 +47,6 @@ class PipelineOrchestrator:
             "[Pipeline] Starting — job=%s document=%s path=%s",
             job_id, document_id, minio_path
         )
-
         # Step 1: Prepare initial data
         # This is the data that will be passed between stages
         current_data = {
@@ -57,7 +54,7 @@ class PipelineOrchestrator:
             "minio_path": minio_path
         }
         results = {}
-
+        
         # Step 2: Loop over all stages
         for index, stage in enumerate(self.stages, 1):
             stage_name = stage.__class__.__name__
@@ -67,18 +64,15 @@ class PipelineOrchestrator:
                     "[Pipeline] Stage %d/%d: %s",
                     index, len(self.stages), stage_name
                 )
-
                 result: StageResult = await stage.execute(
                     input_data=current_data,
                     job_id=str(job_id)
                 )
-
                 # Store the result
                 results[result.stage_name] = {
                     "success": result.success,
                     "metadata": result.metadata
                 }
-
                 # Check if stage failed
                 if not result.success:
                     logger.error(
@@ -91,7 +85,7 @@ class PipelineOrchestrator:
                         "error": result.error,
                         "results": results
                     }
-
+                
                 # Stage succeeded! Prepare data for next stage
                 current_data = result.data
                 logger.info("[Pipeline] Stage %s completed", stage_name)

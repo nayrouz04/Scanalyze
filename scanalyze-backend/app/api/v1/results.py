@@ -6,6 +6,7 @@ PATCH /results/fields/{field_id}/validate  - validate/correct a field (Correct b
 PATCH /results/fields/{field_id}/skip      - skip a field (Skip button)
 POST  /results/{job_id}/approve            - approve all fields (Approve button)
 POST  /results/{job_id}/export             - export final JSON (Export button)
+
 POST  /results/{job_id}/export/pdf         - export final PDF (Export button)
 """
 
@@ -22,6 +23,7 @@ from app.schemas.result import (
     ExtractedFieldResponse,
     FieldValidateRequest,
     ProcessingHistoryResponse,
+
 )
 from app.services.result_service import ResultError, ResultService
 
@@ -82,7 +84,7 @@ async def validate_field(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Triggered when the user clicks Correct
+    Triggered when the user clicks Correct 
     Updates the field with the corrected value
     """
     try:
@@ -106,7 +108,7 @@ async def skip_field(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Triggered when the user clicks Skip
+    Triggered when the user clicks Skip 
     """
     try:
         service = ResultService(db)
@@ -131,11 +133,11 @@ async def approve(
     """
     Triggered when the user clicks Approve, confirms that the user has completed
     the verification. The frontend redirects to the Export interface
-
     """
     try:
         service = ResultService(db)
         await service.approve(job_id=job_id, current_user=current_user)
+
         return MessageResponse(message="Job approved successfully, you can now export the results")
     except ResultError as e:
         raise _result_error_to_http(e)
@@ -162,7 +164,6 @@ async def export_results(
         await db.rollback()
         raise _result_error_to_http(e)
 
-
 @router.post(
     "/{job_id}/export/pdf",
     summary="Export final PDF report",
@@ -185,3 +186,4 @@ async def export_results_pdf(
     except ResultError as e:
         await db.rollback()
         raise _result_error_to_http(e)
+

@@ -118,7 +118,7 @@ async def approve(
     """
     try:
         service = ResultService(db)
-        await service.approve_job(job_id=job_id, current_user=current_user)
+        await service.approve(job_id=job_id, current_user=current_user)
         return MessageResponse(message="Job approved successfully, you can now export the results")
     except ResultError as e:
         raise _result_error_to_http(e)

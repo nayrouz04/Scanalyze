@@ -43,6 +43,11 @@ def process_document(self, job_id: str, document_id: str):
         if job is None:
             logger.error("Job %s not found", job_uuid)
             return
+        
+        document = job.document
+        if document is None:
+            logger.error("Document for job %s not found", job_uuid)
+            return
 
         try:
             # 2. Start processing
@@ -72,6 +77,17 @@ def process_document(self, job_id: str, document_id: str):
                     f"Pipeline failed at stage '{pipeline_result['failed_stage']}': "
                     f"{pipeline_result['error']}"
                 )
+
+            final_data = pipeline_result.get("final_data", {}) or {}
+            confidence = final_data.get("confidence")
+            if confidence is not None:
+                try:
+                    document.confidence_score = float(confidence)
+                except (TypeError, ValueError):
+                    pass
+                
+            if final_data.get("doc_type"):
+                job.ai_model = "rule_based_classifier"
 
             logger.info("Pipeline completed successfully for job=%s", job_uuid)
 

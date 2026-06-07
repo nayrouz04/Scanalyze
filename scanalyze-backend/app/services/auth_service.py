@@ -385,8 +385,6 @@ class AuthService:
             existing = await self.db.execute(
                 select(User).where(User.email == data.email.lower())
             )
-            if existing.scalar_one_or_none():
-                raise AuthError("Email already registered", 409)
             user.email = data.email.lower()
         #update phone number
         if data.phone_nbr is not None:

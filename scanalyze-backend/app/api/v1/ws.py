@@ -7,6 +7,7 @@ import logging
 import uuid
 
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from jose import JWTError
@@ -15,20 +16,50 @@ from sqlalchemy import select
 from app.core.security import decode_access_token
 from app.db.session import AsyncSessionLocal
 from app.models.job import ExtractionJob
-from app.models.user import User
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-#_______ Progress map _________
+#_______Stage weights - average time _________
 
-PROGRESS_MAP = {
-    "queued":        {"status": "Waiting...",     "progress": 0},
-    "OCR Processing":{"status": "OCR Processing", "progress": 25} ,
-    "ai_running":    {"status": "AI Analysis",           "progress": 75},
-    "done":          {"status": "Processing Completed!", "progress": 100},
-    "failed":        {"status": "Processing Failed",     "progress": 0},
+STAGE_WEIGHTS = {
+    "queued":        {"status": "Waiting...",     "elapsed_target": 0},
+    "OCR Processing":{"status": "OCR Processing", "elapsed_target": 30} ,
+    "ai_running":    {"status": "AI Analysis",           "elapsed_target": 60},
+    "done":          {"status": "Processing Completed!", "elapsed_target": None},
+    "failed":        {"status": "Processing Failed",     "elapsed_target": None},
 }
+STAGE_PROGRESS_RANGE = {
+    "queued":      (0,   5),
+    "ocr_running": (5,  50),
+    "ai_running":  (50, 95),
+    "done":        (100, 100),
+    "failed":      (0,   0),
+}
+
+def compute_progress(job: ExtractionJob) -> int:
+    """Calculate dynamic progress based on elapsed time since job started."""
+    status = job.status
+
+    if status == "done":
+        return 100
+    if status == "failed":
+        return 0
+    if status == "queued" or job.started_at is None:
+        return 2
+    #Time since the job started
+    now = datetime.now(timezone.utc)
+    elapsed = (now - job.started_at).total_seconds()
+
+    stage_info = STAGE_WEIGHTS.get(status, {})
+    target = stage_info.get("elapsed_target", 60)
+
+    range_min, range_max = STAGE_PROGRESS_RANGE.get(status, (0, 100))
+
+    ratio = min(elapsed / max(target, 1), 0.95)
+
+    return int(range_min + ratio * (range_max - range_min))
 
 #________ WebSocket endpoint _________
 @router.websocket("/jobs/{job_id}")
@@ -80,7 +111,6 @@ async def job_status_ws(
         
     #Send the status in real time
     try:
-        last_status = None
         while True:
             async with AsyncSessionLocal() as db:
                 
@@ -93,23 +123,18 @@ async def job_status_ws(
                     break
                     
                 current_status = job.status
-                # Send only if the status has changed
-                if current_status != last_status:
-                    progress_info = PROGRESS_MAP.get(current_status, {
-                        "status": current_status,
-                        "progress": 0
-                    })
-                    await websocket.send_json({
-                        "status": progress_info["status"],
-                        "progress": progress_info["progress"],
-                        "job_id": str(job_id),
-                    })
-                    logger.info(
-                        "WebSocket sent status %s for job %s",
-                        current_status,job_id
-                    )
-                        
-                    last_status = current_status
+                progress = compute_progress(job)
+                label = STAGE_WEIGHTS.get(current_status, {}).get("label", current_status)
+                
+                await websocket.send_json({
+                    "status": label,
+                    "progress": progress,
+                    "job_id": str(job_id),
+                })
+                logger.info(
+                    "WebSocket — job=%s status=%s progress=%d%%",
+                    job_id, current_status, progress
+                )
                 
                 # Close the WebSocket if the job is completed  
                 if current_status in ("done", "failed"):

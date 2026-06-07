@@ -139,9 +139,25 @@ async def get_all_documents(
     
 #_______ GET document by ID (admin) ____________
 @router.get(
+    "/{document_id}/download-url",
+    summary="Get a temporary URL for the original document file",
+)
+async def get_document_download_url(
+    document_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        service = DocumentService(db)
+        document = await service.get_document_for_download(document_id, current_user)
+        return {"url": service.create_download_url(document)}
+    except DocumentError as e:
+        raise _document_error_to_http(e)
+
+@router.get(
     "/{document_id}",
     response_model=DocumentResponse,
-    summary="Get a specific document (admin ONLY)"
+    summary="Get a specific document (owner or admin)"
 ) 
 async def get_document_by_id(
     document_id: uuid.UUID,

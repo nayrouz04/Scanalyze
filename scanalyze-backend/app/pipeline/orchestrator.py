@@ -18,6 +18,7 @@ from app.pipeline.base import PipelineStage, StageResult
 from app.pipeline.layout import LayoutDetectionStage
 from app.pipeline.reading_order import ReadingOrderStage
 from app.pipeline.table_handling import TableHandlingStage
+
 from app.pipeline.preprocessor import PreprocessingStage
 from app.pipeline.extractor import OCRExtractionStage
 from app.pipeline.classifier import DocumentClassificationStage
@@ -35,9 +36,9 @@ class PipelineOrchestrator:
     """
     Orchestrates all pipeline stages in order.
     """
-    
     def __init__(self):
         # List of all stages in the pipeline, in order
+
         self.stages: List[PipelineStage] = [
             PreprocessingStage(),        # Stage 1: Clean the image
             LayoutDetectionStage(),       # Stage 2: Detect layout regions
@@ -56,7 +57,6 @@ class PipelineOrchestrator:
             len(self.stages),
             ", ".join(stage.__class__.__name__ for stage in self.stages)
         )
-    
     async def run(self,
                   job_id: UUID,
                   document_id: UUID,
@@ -69,7 +69,6 @@ class PipelineOrchestrator:
             "[Pipeline] Starting — job=%s document=%s path=%s",
             job_id, document_id, minio_path
         )
-        
         # Step 1: Prepare initial data
         # This is the data that will be passed between stages
         current_data = {
@@ -81,18 +80,16 @@ class PipelineOrchestrator:
         # Step 2: Loop over all stages
         for index, stage in enumerate(self.stages, 1):
             stage_name = stage.__class__.__name__
-            
+
             try:
                 logger.info(
                     "[Pipeline] Stage %d/%d: %s",
                     index, len(self.stages), stage_name
                 )
-                
                 result: StageResult = await stage.execute(
                     input_data=current_data,
                     job_id=str(job_id)
                 )
-                
                 # Store the result
                 results[result.stage_name] = {
                     "success": result.success,
@@ -115,7 +112,7 @@ class PipelineOrchestrator:
                 # Stage succeeded! Prepare data for next stage
                 current_data = result.data
                 logger.info("[Pipeline] Stage %s completed", stage_name)
-            
+
             except Exception as e:
                 logger.error(
                     "[Pipeline] Stage %s CRASHED: %s",

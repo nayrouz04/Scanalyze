@@ -1,96 +1,189 @@
-import { useState } from "react";
+// src/pages/auth/SignUpPage.tsx  (backoffice)
+import { useState }          from "react";
 import {
   Box, Paper, TextField, Button, Typography,
-  Link, MenuItem, Select, InputLabel, FormControl, Divider,
+  Link, MenuItem, Select, InputLabel, FormControl,
+  Divider, CircularProgress, Alert,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import PersonIcon   from "@mui/icons-material/Person";
-import SecurityIcon from "@mui/icons-material/Security";
-import { useNavigate } from "react-router-dom";
-import { colors }      from "@theme";
-import logo            from "@assets/logo.svg";
-import { ROUTES }      from "@constants";
+import PersonIcon      from "@mui/icons-material/Person";
+import SecurityIcon    from "@mui/icons-material/Security";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { useNavigate }         from "react-router-dom";
+import { useRegisterMutation } from "@services/authApi";
+import { colors }              from "@theme";
+import logo                    from "@assets/logo.svg";
+import { ROUTES }              from "@constants";
 
-// FormState — all registration form fields grouped in a single typed object
 interface FormState {
-  fullName:  string;
-  birthDate: string;
-  phone:     string;
-  role:      string;
-  address:   string;
-  email:     string;
-  password:  string;
-  confirm:   string;
+  fullName: string;
+  phone:    string;
+  role:     "user" | "admin" | "";
+  address:  string;
+  email:    string;
+  password: string;
+  confirm:  string;
 }
 
-// Initial empty state — defined outside component to avoid re-creation on each render
 const INITIAL_FORM: FormState = {
-  fullName:  "",
-  birthDate: "",
-  phone:     "",
-  role:      "",
-  address:   "",
-  email:     "",
-  password:  "",
-  confirm:   "",
+  fullName: "",
+  phone:    "",
+  role:     "",
+  address:  "",
+  email:    "",
+  password: "",
+  confirm:  "",
+};
+
+const validatePassword = (pwd: string): string | null => {
+  if (pwd.length < 8)
+    return "Le mot de passe doit contenir au moins 8 caractères.";
+  if (!/[A-Z]/.test(pwd))
+    return "Le mot de passe doit contenir au moins une majuscule.";
+  if (!/[0-9]/.test(pwd))
+    return "Le mot de passe doit contenir au moins un chiffre.";
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd))
+    return "Le mot de passe doit contenir au moins un caractère spécial (!@#$%...).";
+  return null;
 };
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const [registerUser, { isLoading }] = useRegisterMutation();
+  const [form,    setForm]    = useState<FormState>(INITIAL_FORM);
+  const [error,   setError]   = useState<string>("");
+  const [success, setSuccess] = useState<boolean>(false);
+  // ✅ on garde l'email saisi même après reset du form pour l'afficher dans l'écran succès
+  const [submittedEmail, setSubmittedEmail] = useState<string>("");
 
-  // Single typed state object holding every form field
-  const [form,  setForm ] = useState<FormState>(INITIAL_FORM);
-
-  // Error message — empty string means no error is displayed
-  const [error, setError] = useState<string>("");
-
-  // Handler for standard TextField inputs — properly typed with React.ChangeEvent
   const handleChange =
     (field: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void =>
-      setForm((prev: FormState) => ({ ...prev, [field]: e.target.value }));
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // Handler for MUI Select — uses SelectChangeEvent instead of ChangeEvent
   const handleSelectChange =
     (field: keyof FormState) =>
-    (e: SelectChangeEvent<string>): void =>
-      setForm((prev: FormState) => ({ ...prev, [field]: e.target.value }));
+    (e: SelectChangeEvent<string>) =>
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleSignUp = (): void => {
-    // Validate required fields
-    if (!form.fullName || !form.email || !form.password || !form.confirm) {
-      setError("All required fields must be filled in");
+  const handleSignUp = async () => {
+    setError("");
+
+    if (!form.fullName || !form.email || !form.password || !form.confirm || !form.address) {
+      setError("Tous les champs obligatoires (*) doivent être remplis.");
       return;
     }
-    // Validate password confirmation match
+
+    const pwdError = validatePassword(form.password);
+    if (pwdError) { setError(pwdError); return; }
+
     if (form.password !== form.confirm) {
-      setError("Passwords do not match");
+      setError("Les mots de passe ne correspondent pas.");
       return;
     }
-    // Success — account pending admin activation
-    alert("Account created! Awaiting activation by an admin.");
-    navigate(ROUTES.LOGIN);
+
+    const payload = {
+      email:          form.email,
+      password:       form.password,
+      full_name:      form.fullName,
+      office_address: form.address,
+      role:           (form.role || "user") as "admin" | "user",
+      ...(form.phone && { phone_nbr: form.phone }),
+    };
+
+    try {
+      await registerUser(payload).unwrap();
+      setSubmittedEmail(form.email);
+      setSuccess(true);
+      setForm(INITIAL_FORM);
+
+    } catch (err: any) {
+      const status = err?.status;
+      const data   = err?.data;
+
+      // ✅ Admin non vérifié qui re-soumet → email renvoyé côté backend, on affiche succès
+      if (status === 409 && form.role === "admin") {
+        setSubmittedEmail(form.email);
+        setSuccess(true);
+        setForm(INITIAL_FORM);
+        return;
+      }
+
+      if (data?.errors && Array.isArray(data.errors)) {
+        const messages = data.errors
+          .map((e: any) => e.message ?? e.msg ?? JSON.stringify(e))
+          .join(" | ");
+        setError(messages);
+      } else if (data?.detail && typeof data.detail === "string") {
+        setError(data.detail);
+      } else {
+        setError("Erreur lors de la création du compte.");
+      }
+    }
   };
 
+  // ── Écran de succès ────────────────────────────────────────────────────────
+  if (success) {
+    return (
+      <Box sx={{
+        minHeight:       "100vh",
+        display:         "flex",
+        justifyContent:  "center",
+        alignItems:      "center",
+        backgroundColor: colors.bgPage,
+        py: 4,
+      }}>
+        <Paper sx={{ padding: 4, width: "90%", maxWidth: 480, borderRadius: 3, textAlign: "center" }}>
+          <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
+            <img src={logo} alt="Scanalyze" height={50} />
+          </Box>
+          <CheckCircleIcon sx={{ fontSize: 64, color: colors.green, mb: 2 }} />
+          <Typography variant="h6" fontWeight={700} color={colors.textWhite} mb={1}>
+            Compte créé avec succès !
+          </Typography>
+          <Typography variant="body2" color={colors.textMuted} mb={3}>
+            Un email de vérification a été envoyé à{" "}
+            <strong>{submittedEmail}</strong>.
+            <br />
+            Veuillez cliquer sur le lien dans l'email pour activer votre compte.
+            <br />
+            <Typography component="span" variant="body2" color={colors.amber}>
+              Ce lien expirera dans 24 heures.
+            </Typography>
+          </Typography>
+          <Alert severity="info" sx={{ mb: 3, textAlign: "left" }}>
+            Si vous ne trouvez pas l'email, vérifiez votre dossier spam ou
+            re-soumettez le formulaire pour renvoyer le lien.
+          </Alert>
+          <Button
+            fullWidth
+            variant="contained"
+            sx={{ py: 1.5 }}
+            onClick={() => navigate(ROUTES.LOGIN)}
+          >
+            Retour à la connexion
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // ── Formulaire ─────────────────────────────────────────────────────────────
   return (
-    // FIX: minHeight moved inside sx={} to prevent MUI from forwarding it
-    // as an attribute to the native DOM element, which causes React warnings.
     <Box sx={{
       minHeight:       "100vh",
       display:         "flex",
       justifyContent:  "center",
       alignItems:      "center",
       backgroundColor: colors.bgPage,
-      py:              4,
+      py: 4,
     }}>
       <Paper sx={{ padding: 4, width: "90%", maxWidth: 560, borderRadius: 3 }}>
 
-        {/* Logo */}
         <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
           <img src={logo} alt="Scanalyze" height={50} />
         </Box>
 
-        {/* ── Personal Information section ── */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <PersonIcon sx={{ color: colors.blueMuted }} />
           <Typography variant="body2" color={colors.blueMuted} fontWeight="bold" letterSpacing={1}>
@@ -98,29 +191,20 @@ export default function SignUpPage() {
           </Typography>
         </Box>
 
-        {/* Full Name + Date of Birth */}
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
           <TextField
-            fullWidth label="Full Name" placeholder="John Doe"
+            fullWidth label="Full Name *" placeholder="John Doe"
             value={form.fullName} onChange={handleChange("fullName")}
           />
           <TextField
-            fullWidth label="Date of Birth"
-            value={form.birthDate} onChange={handleChange("birthDate")}
-            onFocus={(e: React.FocusEvent<HTMLInputElement>): void => { e.target.type = "date"; }}
-            onBlur={(e: React.FocusEvent<HTMLInputElement>):  void => { if (!e.target.value) e.target.type = "text"; }}
+            fullWidth label="Phone Number" placeholder="+216 12 345 678"
+            value={form.phone} onChange={handleChange("phone")}
           />
         </Box>
 
-        {/* Phone + Role */}
-        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-          <TextField
-            fullWidth label="Phone Number" placeholder="0123456789"
-            value={form.phone} onChange={handleChange("phone")}
-          />
+        <Box sx={{ mb: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Role</InputLabel>
-            {/* handleSelectChange used here because MUI Select has a different event type */}
             <Select value={form.role} onChange={handleSelectChange("role")} label="Role">
               <MenuItem value="" disabled>Select role</MenuItem>
               <MenuItem value="user">User</MenuItem>
@@ -129,17 +213,17 @@ export default function SignUpPage() {
           </FormControl>
         </Box>
 
-        {/* Office Address */}
         <TextField
-          fullWidth label="Office Address"
+          fullWidth
+          label="Office Address *"
           placeholder="Street name, City, Postal Code, Country"
-          value={form.address} onChange={handleChange("address")}
+          value={form.address}
+          onChange={handleChange("address")}
           sx={{ mb: 2 }}
         />
 
         <Divider sx={{ my: 3 }} />
 
-        {/* ── Account Security section ── */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <SecurityIcon sx={{ color: colors.blueMuted }} />
           <Typography variant="body2" color={colors.blueMuted} fontWeight="bold" letterSpacing={1}>
@@ -147,41 +231,50 @@ export default function SignUpPage() {
           </Typography>
         </Box>
 
-        {/* Professional Email */}
         <TextField
-          fullWidth label="Professional Email" placeholder="email@company.com"
-          value={form.email} onChange={handleChange("email")}
+          fullWidth
+          label="Professional Email *"
+          placeholder="email@company.com"
+          value={form.email}
+          onChange={handleChange("email")}
           sx={{ mb: 2 }}
+          autoComplete="email"
         />
 
-        {/* Password + Confirm Password */}
         <Box sx={{ display: "flex", gap: 2 }}>
           <TextField
-            fullWidth label="Password" type="password"
-            helperText="Min. 8 chars with 1 number"
-            value={form.password} onChange={handleChange("password")}
+            fullWidth label="Password *" type="password"
+            helperText="Min. 8 cars, 1 majuscule, 1 chiffre, 1 caractère spécial"
+            value={form.password}
+            onChange={handleChange("password")}
+            autoComplete="new-password"
           />
           <TextField
-            fullWidth label="Confirm Password" type="password"
-            value={form.confirm} onChange={handleChange("confirm")}
+            fullWidth label="Confirm Password *" type="password"
+            value={form.confirm}
+            onChange={handleChange("confirm")}
+            autoComplete="new-password"
           />
         </Box>
 
-        {/* Inline error message */}
         {error && (
-          <Typography color="error" variant="body2" mt={2}>{error}</Typography>
+          <Typography color="error" variant="body2" mt={2} sx={{ whiteSpace: "pre-line" }}>
+            {error}
+          </Typography>
         )}
 
-        {/* Submit button */}
         <Button
           fullWidth variant="contained"
           sx={{ mt: 3, py: 1.5, fontSize: "1rem" }}
           onClick={handleSignUp}
+          disabled={isLoading}
         >
-          Create Account →
+          {isLoading
+            ? <CircularProgress size={24} color="inherit" />
+            : "Create Account →"
+          }
         </Button>
 
-        {/* Link to login page */}
         <Box sx={{ textAlign: "center", mt: 2 }}>
           <Typography variant="body2" color={colors.textMuted}>
             Already have an account?{" "}

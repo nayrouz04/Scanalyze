@@ -1,22 +1,67 @@
-// authModels.ts — TypeScript interfaces for authentication-related data
-// Used across authSlice.ts, authApi.ts, and PrivateRoute.tsx
-
-// User — represents an authenticated user in the system
-export interface User {
-  name:  string;
-  email: string;
-  role:  "admin" | "user";
+export interface LoginRequest {
+  login:    string;
+  password: string;
 }
 
-// AuthState — shape of the auth slice in the Redux store
-export interface AuthState {
-  user:            User | null;
-  token:           string | null;
-  isAuthenticated: boolean;
+export interface LoginResponse {
+  access_token:  string;
+  refresh_token: string;
+  token_type:    string;
+  expires_in:    number;
+  user: {
+    id:        string;
+    email:     string;
+    full_name: string;
+    role:      string;
+  };
 }
 
-// SetCredentialsPayload — data dispatched after a successful login response
-export interface SetCredentialsPayload {
-  user:  User;
-  token: string;
+export interface RegisterRequest {
+  email:          string;
+  password:       string;
+  full_name:      string;
+  office_address: string;
+  role?:          'admin' | 'user';
+}
+
+export interface RegisterResponse {
+  id:              string;
+  email:           string;
+  full_name:       string;
+  role:            string;
+  is_active:       boolean;
+  is_verified:     boolean;
+  account_enabled: boolean;
+  created_at:      string;
+  office_address:  string;
+  phone_nbr:       string | null;
+  birth_date:      string | null;
+}
+
+export interface ForgotPasswordRequest { email: string; }
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password:     string;
+}
+
+export interface AdminUser {
+  id:              string;
+  email:           string;
+  full_name:       string;
+  office_address:  string;
+  phone_nbr?:      string;
+  role:            'admin' | 'user';
+  is_active:       boolean;
+}
+
+export interface DashboardStats {
+  documents_processed?:      number;
+  extraction_success_rate?:  number;
+  low_confidence_documents?: number;
+  most_processed_doc_type?:  string | null;
+  total_users?:              number;
+  total_documents?:          number;
+  total_jobs?:               number;
+  total_errors?:             number;
 }

@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from app.db.session import get_sync_db
 from app.models.job import ExtractionJob
+
 from app.models.result import ExtractedField, Result  
 from app.models.document import Document             
 from app.models.user import User      
@@ -53,6 +54,9 @@ def process_document(self, job_id: str, document_id: str):
             # 2. Start processing
             job.started_at = datetime.now(timezone.utc)
             job.status = "ocr_running"
+            
+            if job.document:
+                job.document.status = "processing"
             db.commit()
 
             minio_path = job.document.minio_path
@@ -97,6 +101,8 @@ def process_document(self, job_id: str, document_id: str):
             job.duration_ms = int(
                 (job.completed_at - job.started_at).total_seconds() * 1000
             )
+            if job.document:
+                job.document.status = "done"
             db.commit()
             logger.info("Job %s completed in %d ms", job_uuid, job.duration_ms)
 
@@ -111,4 +117,7 @@ def process_document(self, job_id: str, document_id: str):
             else:
                 job.status = "failed"
                 job.error_message = str(e)
+                if job.document:
+                    job.document.status = "failed"
                 db.commit()
+

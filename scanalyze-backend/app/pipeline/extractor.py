@@ -1,14 +1,18 @@
+
   # PaddleOCR(with fallback logic)
 """OCR extraction stage.
 This stage: 
 1 reads the preprocessed image from MinIO
 2 runs PaddleOCR for extraction data if the engine is available, otherwise falls back to a simple image analysis
 3 returns text/line/bbox data for later classification.
+
+
 """
 
 from __future__ import annotations
 
 import logging
+
 from dataclasses import dataclass
 from typing import Any, Dict, List
 from uuid import UUID

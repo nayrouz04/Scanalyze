@@ -1,5 +1,5 @@
 // HistoryPage — affiche la liste des fichiers JSON générés après traitement OCR/LLaMA
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Chip, IconButton, Tooltip,
@@ -27,23 +27,23 @@ import FactCheckIcon     from "@mui/icons-material/FactCheck";
 import { colors }        from "@theme";
 import { useNavigate }   from "react-router-dom";
 import { ROUTES }        from "@constants";
-import fakeResults from "../../assets/fakeData/history-results.json";
- 
-const USE_FAKE_DATA = true;
-const API_BASE_URL  = "http://localhost:5000";
+import { useGetProcessingHistoryQuery } from "@services";
  
 interface ProcessingResult {
   id:                  string;
+  job_id:              string;
+  document_id:         string;
   source_document:     string;
   json_filename:       string;
-  doc_type:            string;
-  processed_at:        string;
-  processing_time_ms:  number;
-  confidence:          number;
+  doc_type:            string | null;
+  processed_at:        string | null;
+  processing_time_ms:  number | null;
+  confidence:          number | null;
   fields_extracted:    number;
-  language:            string;
-  size:                string;
-  status:              "uploaded" | "processing" | "failed";
+  language:            string | null;
+  size:                string | null;
+  status:              string;
+  exported_data?:      string | null;
 }
  
 // ── Type colors — hors palette globale ──────────────────────────────────────
@@ -64,11 +64,19 @@ const typeConfig = [
 const typeChipSx = (type: string) =>
   TYPE_COLORS[type] ?? { bgcolor: colors.bgHover, color: colors.textMuted };
  
-const confidenceColor = (score: number): string => {
+const confidenceColor = (score?: number | null): string => {
+  if (score == null) return colors.textSecondary;
   if (score >= 0.95) return colors.green;
   if (score >= 0.85) return colors.amber;
   return colors.red;
 };
+
+const formatConfidence = (score?: number | null) =>
+  score == null ? "N/A" : `${(score * 100).toFixed(0)}%`;
+
+const normalizeDocType = (type?: string | null) => type ?? "others";
+
+const formatLanguage = (language?: string | null) => (language ?? "fr").toUpperCase();
  
 const statusConfig = {
   uploaded:   { label: "Uploadé",  color: "#20c997", bgcolor: "#20c99722", icon: <CloudUploadIcon sx={{ fontSize: 13 }} /> },
@@ -76,19 +84,36 @@ const statusConfig = {
   failed:     { label: "Échoué",   color: colors.red, bgcolor: `${colors.red}22`, icon: <ErrorIcon sx={{ fontSize: 13 }} /> },
 } as const;
  
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleString("fr-FR", {
+const formatDate = (iso?: string | null) => {
+  if (!iso) return "N/A";
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleString("fr-FR", {
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+};
  
-const formatDuration = (ms: number) => {
+const formatDuration = (ms?: number | null) => {
+  if (ms == null) return "N/A";
   if (ms < 1000)  return `${ms} ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`;
   return `${(ms / 60000).toFixed(1)} min`;
 };
  
-const buildFakeJsonPreview = (result: ProcessingResult): object => ({
+const parseExportedData = (exportedData?: string | null): object | null => {
+  if (!exportedData) return null;
+  try {
+    return JSON.parse(exportedData);
+  } catch {
+    return null;
+  }
+};
+
+const buildFakeJsonPreview = (result: ProcessingResult): object => (
+  parseExportedData(result.exported_data) ?? {
   document_id:    result.id,
   source_file:    result.source_document,
   doc_type:       result.doc_type,
@@ -121,7 +146,8 @@ const buildFakeJsonPreview = (result: ProcessingResult): object => ({
     ocr_engine: "PaddleOCR", nlp_model: "LLaMA via Ollama", ner_library: "spaCy",
     processing_time_ms: result.processing_time_ms, fields_count: result.fields_extracted,
   },
-});
+  }
+);
  
 // ── DocumentOriginalContent ──────────────────────────────────────────────────
 const DocumentOriginalContent: React.FC<{ result: ProcessingResult }> = ({ result }) => {
@@ -323,7 +349,7 @@ const JsonPreviewModal: React.FC<{ result: ProcessingResult | null; onClose: () 
       <DialogContent sx={{ bgcolor: colors.bgCard, p: 0 }}>
         <Box sx={{ px: 2.5, pt: 2, pb: 1, display: "flex", gap: 2, flexWrap: "wrap" }}>
           <Chip label={`Source : ${result.source_document}`} size="small" icon={<DescriptionIcon />} sx={{ bgcolor: `${TYPE_COLORS.invoices.color}22`, color: TYPE_COLORS.invoices.color, fontSize: 11 }} />
-          <Chip label={`Confiance : ${(result.confidence * 100).toFixed(0)}%`} size="small" icon={<CheckCircleIcon />} sx={{ bgcolor: `${confidenceColor(result.confidence)}22`, color: confidenceColor(result.confidence), fontSize: 11 }} />
+          <Chip label={`Confiance : ${formatConfidence(result.confidence)}`} size="small" icon={<CheckCircleIcon />} sx={{ bgcolor: `${confidenceColor(result.confidence)}22`, color: confidenceColor(result.confidence), fontSize: 11 }} />
           <Chip label={`Traitement : ${formatDuration(result.processing_time_ms)}`} size="small" icon={<AccessTimeIcon />} sx={{ bgcolor: `${colors.textSecondary}22`, color: colors.textSecondary, fontSize: 11 }} />
           <Chip label={`${result.fields_extracted} champs extraits`} size="small" sx={{ bgcolor: `${TYPE_COLORS.cv.color}22`, color: TYPE_COLORS.cv.color, fontSize: 11 }} />
           <Chip label={`Traité le : ${formatDate(result.processed_at)}`} size="small" icon={<CalendarTodayIcon sx={{ fontSize: 13 }} />} sx={{ bgcolor: `${TYPE_COLORS.contrat.color}22`, color: TYPE_COLORS.contrat.color, fontSize: 11, "& .MuiChip-icon": { color: TYPE_COLORS.contrat.color } }} />
@@ -334,7 +360,7 @@ const JsonPreviewModal: React.FC<{ result: ProcessingResult | null; onClose: () 
       </DialogContent>
       <DialogActions sx={{ bgcolor: colors.bgDark, borderTop: `1px solid ${colors.borderCard}`, px: 2.5, py: 1.2, gap: 1 }}>
         <Typography variant="caption" sx={{ color: colors.textSecondary, flexGrow: 1 }}>
-          JSON · {result.size} · Langue : {result.language.toUpperCase()}
+          JSON · {result.size ?? "N/A"} · Langue : {formatLanguage(result.language)}
         </Typography>
         <Button size="small" onClick={onClose} variant="contained" sx={{ bgcolor: colors.bgHover, color: colors.textLight, textTransform: "none", "&:hover": { bgcolor: colors.borderExport } }}>
           Fermer
@@ -365,7 +391,7 @@ const DocumentPreviewModal: React.FC<{ result: ProcessingResult | null; onClose:
             <Typography variant="subtitle2" fontWeight={700} sx={{ color: colors.textLight, lineHeight: 1.2 }}>{result.source_document}</Typography>
             <Typography variant="caption" sx={{ color: colors.textSecondary }}>Document source original</Typography>
           </Box>
-          <Chip label={typeDocLabel[result.doc_type] ?? result.doc_type} size="small" sx={{ ...typeChipSx(result.doc_type), fontSize: 11, fontWeight: 700, ml: 1 }} />
+          <Chip label={typeDocLabel[normalizeDocType(result.doc_type)] ?? normalizeDocType(result.doc_type)} size="small" sx={{ ...typeChipSx(normalizeDocType(result.doc_type)), fontSize: 11, fontWeight: 700, ml: 1 }} />
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <IconButton size="small" onClick={() => setZoom(z => Math.max(60, z - 10))} sx={{ color: colors.textSecondary, "&:hover": { color: colors.textLight } }}><ZoomOutIcon fontSize="small" /></IconButton>
@@ -376,10 +402,10 @@ const DocumentPreviewModal: React.FC<{ result: ProcessingResult | null; onClose:
         </Box>
       </DialogTitle>
       <Box sx={{ bgcolor: colors.bgDark, borderBottom: `1px solid ${colors.borderCard}`, px: 2.5, py: 1, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", flexShrink: 0 }}>
-        <Chip label={`Confiance : ${(result.confidence * 100).toFixed(0)}%`} size="small" icon={<CheckCircleIcon sx={{ fontSize: 13, color: `${confidenceColor(result.confidence)} !important` }} />} sx={{ bgcolor: `${confidenceColor(result.confidence)}22`, color: confidenceColor(result.confidence), fontSize: 11, fontWeight: 700 }} />
+        <Chip label={`Confiance : ${formatConfidence(result.confidence)}`} size="small" icon={<CheckCircleIcon sx={{ fontSize: 13, color: `${confidenceColor(result.confidence)} !important` }} />} sx={{ bgcolor: `${confidenceColor(result.confidence)}22`, color: confidenceColor(result.confidence), fontSize: 11, fontWeight: 700 }} />
         <Chip label={`${result.fields_extracted} champs extraits`} size="small" sx={{ bgcolor: `${TYPE_COLORS.cv.color}15`, color: TYPE_COLORS.cv.color, fontSize: 11 }} />
         <Chip label={`Traitement : ${formatDuration(result.processing_time_ms)}`} size="small" icon={<AccessTimeIcon sx={{ fontSize: 13 }} />} sx={{ bgcolor: `${TYPE_COLORS.invoices.color}15`, color: TYPE_COLORS.invoices.color, fontSize: 11 }} />
-        <Chip label={result.size} size="small" sx={{ bgcolor: `${colors.textWhite}10`, color: colors.textSecondary, fontSize: 11 }} />
+        <Chip label={result.size ?? "N/A"} size="small" sx={{ bgcolor: `${colors.textWhite}10`, color: colors.textSecondary, fontSize: 11 }} />
         <Typography variant="caption" sx={{ color: colors.textSecondary, ml: "auto", fontSize: "0.74rem" }}>Traité le {formatDate(result.processed_at)}</Typography>
       </Box>
       <DialogContent sx={{ bgcolor: colors.bgPage, p: 3, overflowY: "auto", flex: 1 }}>
@@ -389,7 +415,7 @@ const DocumentPreviewModal: React.FC<{ result: ProcessingResult | null; onClose:
       </DialogContent>
       <DialogActions sx={{ bgcolor: colors.bgDark, borderTop: `1px solid ${colors.borderCard}`, px: 2.5, py: 1.2, flexShrink: 0 }}>
         <Typography variant="caption" sx={{ color: colors.textSecondary, flexGrow: 1 }}>
-          PDF · {result.size} · Langue : {result.language.toUpperCase()} · {result.source_document}
+          PDF · {result.size ?? "N/A"} · Langue : {formatLanguage(result.language)} · {result.source_document}
         </Typography>
         <Button size="small" onClick={onClose} variant="contained" sx={{ bgcolor: colors.bgHover, color: colors.textLight, textTransform: "none", "&:hover": { bgcolor: colors.borderExport } }}>
           Fermer
@@ -403,33 +429,28 @@ const DocumentPreviewModal: React.FC<{ result: ProcessingResult | null; onClose:
 const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
  
-  const [results, setResults]             = useState<ProcessingResult[]>([]);
-  const [loading, setLoading]             = useState(true);
   const [previewResult, setPreview]       = useState<ProcessingResult | null>(null);
   const [docPreviewResult, setDocPreview] = useState<ProcessingResult | null>(null);
   const [search, setSearch]               = useState("");
   const [typeFilter, setTypeFilter]       = useState("all");
   const [page, setPage]                   = useState(0);
   const [rowsPerPage, setRowsPerPage]     = useState(5);
+
+  const {
+    data: results = [],
+    isLoading: loading,
+  } = useGetProcessingHistoryQuery();
  
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setResults(fakeResults as ProcessingResult[]);
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
- 
-  const filteredResults = results.filter((r) => {
+  const filteredResults = (results || []).filter((r) => {
     const matchSearch =
       search === "" ||
-      r.source_document.toLowerCase().includes(search.toLowerCase()) ||
-      r.json_filename.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "all" || r.doc_type === typeFilter;
+      (r.source_document?.toLowerCase?.() || "").includes(search.toLowerCase()) ||
+      (r.json_filename?.toLowerCase?.() || "").includes(search.toLowerCase());
+    const matchType = typeFilter === "all" || (r.doc_type ?? "others") === typeFilter;
     return matchSearch && matchType;
   });
  
-  const paginatedResults = filteredResults.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const paginatedResults = (filteredResults || []).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
  
   const handleSearchChange      = (value: string) => { setSearch(value); setPage(0); };
   const handleTypeFilterChange  = (value: string) => { setTypeFilter(value); setPage(0); };
@@ -438,7 +459,7 @@ const HistoryPage: React.FC = () => {
  
   const handleVerify = (result: ProcessingResult) => {
     navigate(ROUTES.VERIFICATION, {
-      state: { fromHistory: true, documentId: result.id, sourceDocument: result.source_document, docType: result.doc_type },
+      state: { fromHistory: true, documentId: result.document_id, jobId: result.job_id, sourceDocument: result.source_document, docType: result.doc_type },
     });
   };
  
@@ -527,21 +548,21 @@ const HistoryPage: React.FC = () => {
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
                       <DataObjectIcon sx={{ fontSize: 15, color: TYPE_COLORS.invoices.color }} />
                       <Typography variant="body2" sx={{ color: TYPE_COLORS.invoices.color, fontFamily: "monospace", fontSize: "0.82rem" }}>
-                        {result.json_filename}
+                        {result.json_filename || "N/A"}
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{result.source_document}</TableCell>
+                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{result.source_document || "N/A"}</TableCell>
                   <TableCell>
-                    <Chip label={result.doc_type} size="small" sx={{ fontSize: 11, fontWeight: 600, textTransform: "capitalize", ...typeChipSx(result.doc_type) }} />
+                    <Chip label={result.doc_type || "unknown"} size="small" sx={{ fontSize: 11, fontWeight: 600, textTransform: "capitalize", ...typeChipSx(result.doc_type || "") }} />
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="body2" fontWeight="bold" sx={{ color: confidenceColor(result.confidence) }}>
-                      {(result.confidence * 100).toFixed(0)}%
+                      {formatConfidence(result.confidence)}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{formatDuration(result.processing_time_ms)}</TableCell>
-                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{formatDate(result.processed_at)}</TableCell>
+                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{result.processing_time_ms ? formatDuration(result.processing_time_ms) : "N/A"}</TableCell>
+                  <TableCell sx={{ color: colors.textSecondary, fontSize: "0.82rem" }}>{result.processed_at ? formatDate(result.processed_at) : "N/A"}</TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.8 }}>
                       <Tooltip title="Vérifier et corriger ce document" placement="top">

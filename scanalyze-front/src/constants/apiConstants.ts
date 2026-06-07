@@ -1,30 +1,43 @@
-/**
- * apiConstants.ts — centralized API configuration and endpoint paths.
- *
- * API_BASE_URL is read from the environment variable VITE_API_BASE_URL.
- * Never hardcode the URL here — change it in .env instead.
- */
+// src/constants/apiConstants.ts
+ 
+export const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-// ── Base URL — loaded from environment variable ───────────────────
-export const API_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL as string;
-
-// ── Cache tag types (RTK Query invalidation) ─────────────────────
-export const API_TAGS = {
-  DOCUMENTS: "Documents",
-  USERS:     "Users",
-} as const;
-
-// ── Endpoint paths ────────────────────────────────────────────────
+// ── Endpoints ─────────────────────────────────────────────────────────────────
 export const API_ENDPOINTS = {
+  // Auth
+  LOGIN:           "/auth/token",
+  REGISTER:        "/auth/register",
+  FORGOT_PASSWORD: "/auth/forgot-password",
+  CHANGE_PASSWORD: "/auth/change-password",
+ 
   // Documents
-  UPLOAD:   "upload",
-  RESULTS:  "results",
-  STATS:    "stats",
-  ACTIVITY: "activity",
+  DOCUMENTS:        "/documents/",
+  MY_DOCUMENTS:     "/documents/owned",
+  DOCUMENT_BY_ID:   (id: string) => `/documents/${id}`,
+  DOCUMENT_DOWNLOAD_URL: (id: string) => `/documents/${id}/download-url`,
+  UPLOAD_DOCUMENT:  "/documents/upload",
+ 
+  // Jobs
+  JOBS:      "/jobs/",
+  JOB_BY_ID: (id: string) => `/jobs/${id}`,
 
-  // Users
-  USERS:         "users",
-  USER_BY_ID:    (id: string): string => `users/${id}`,
-  USER_ACTIVATE: (id: string): string => `users/${id}/activate`,
+  // Results
+  RESULTS_HISTORY: "/results/history",
+ 
+  // Admin
+  ADMIN_USERS:      "/admin/users",
+  ADMIN_USER_BY_ID: (id: string) => `/admin/users/${id}`,
+  ADMIN_ENABLE:     (id: string) => `/admin/users/${id}/enable`,
+  ADMIN_DISABLE:    (id: string) => `/admin/users/${id}/disable`,
+  ADMIN_DASHBOARD:  "/admin/dashboard",
 } as const;
+ 
+// ── Cache Tags (RTK Query) ─────────────────────────────────────────────────────
+export const API_TAGS = {
+  DOCUMENT:  "Document",
+  USER:      "User",
+  JOB:       "Job",
+  DASHBOARD: "Dashboard",
+} as const;
+ 
+export type ApiTag = (typeof API_TAGS)[keyof typeof API_TAGS];

@@ -1,11 +1,18 @@
-// Typed Redux hooks — use these instead of plain useDispatch / useSelector.
-// Pre-typed with RootState and AppDispatch so no manual typing is needed in components.
+// src/app/hooks.ts
 import { useDispatch, useSelector } from "react-redux";
 import type { TypedUseSelectorHook } from "react-redux";
 import type { RootState, AppDispatch } from "./store";
-
-// useAppDispatch — typed dispatch, supports thunks and RTK Query mutations
+import { selectIsAuthenticated, selectRole } from "../features/auth/authSlice";
+ 
+// Typed dispatch — supporte les thunks et les mutations RTK Query
 export const useAppDispatch: () => AppDispatch = useDispatch;
-
-// useAppSelector — typed selector with full RootState autocomplete
+ 
+// Typed selector — autocomplétion complète sur RootState
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+ 
+// Hook raccourci — accès rapide à l'état d'authentification
+export const useAuth = () => {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const role            = useAppSelector(selectRole);
+  return { isAuthenticated, role, isAdmin: role === "admin" };
+};

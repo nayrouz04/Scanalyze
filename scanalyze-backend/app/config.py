@@ -61,7 +61,7 @@ class Settings(BaseSettings):
 
     # ── Ollama ────────────────────────────────
     OLLAMA_HOST: str = "http://ollama:11434"
-    OLLAMA_MODEL: str = "llama3.2"
+    OLLAMA_MODEL: str = "qwen2.5:0.5b"
     OLLAMA_TIMEOUT: int = 120
 
     # ── Object Storage ────────────────────────

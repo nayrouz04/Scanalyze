@@ -36,7 +36,7 @@ from app.services.document_service import get_s3_client
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-def load_image_from_minio(minio_path: str) -> np.ndarray:
+def load_image_from_minio(minio_path: str, bucket: str | None = None) -> np.ndarray:
     """ 
     load an image from MinIO and convert it to a numpy array
     """
@@ -44,7 +44,7 @@ def load_image_from_minio(minio_path: str) -> np.ndarray:
         s3 = get_s3_client()
         #download the file from MinIO
         response = s3.get_object(
-            Bucket=settings.S3_BUCKET_UPLOADS,
+            Bucket=bucket or settings.S3_BUCKET_UPLOADS,
             Key=minio_path
         )
         file_bytes = response['Body'].read()
@@ -205,6 +205,8 @@ class PreprocessingStage(PipelineStage):
                 data={
                     "image": preprocessed_image, #numpy array of the preprocessed image, passed to the next stage for OCR  
                     "minio_path": preprocessed_minio_path,  
+                    "preprocessed_image_path": preprocessed_minio_path,  
+                    "preprocessed_bucket": settings.S3_BUCKET_RESULTS,
                     "document_id": document_id,  
                 },
                 metadata={

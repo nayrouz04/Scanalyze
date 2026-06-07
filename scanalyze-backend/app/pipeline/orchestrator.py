@@ -9,13 +9,25 @@ The orchestrator is the "conductor" of the pipeline. It:
 3. Handles errors
 4. Returns the final result
 """
+from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 from uuid import UUID
 
-from app.pipeline.base import StageResult
-from app.pipeline.extractor import OCRExtractionStage
+from app.pipeline.base import PipelineStage, StageResult
+from app.pipeline.layout import LayoutDetectionStage
+from app.pipeline.reading_order import ReadingOrderStage
+from app.pipeline.table_handling import TableHandlingStage
+
 from app.pipeline.preprocessor import PreprocessingStage
+from app.pipeline.extractor import OCRExtractionStage
+from app.pipeline.classifier import DocumentClassificationStage
+from app.pipeline.analyser import DocumentAnalysisStage
+from app.pipeline.structured_extractor import StructuredExtractionStage
+from app.pipeline.grounding import GroundingStage
+from app.pipeline.normalizer import BusinessNormalizationStage
+from app.pipeline.persistence import PersistenceStage
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +38,19 @@ class PipelineOrchestrator:
     """
     def __init__(self):
         # List of all stages in the pipeline, in order
-        self.stages: List[Any] = [
-            PreprocessingStage(),      # Stage 1: Clean the image
-            OCRExtractionStage(),      # Stage 2: Extract text
+
+        self.stages: List[PipelineStage] = [
+            PreprocessingStage(),        # Stage 1: Clean the image
+            LayoutDetectionStage(),       # Stage 2: Detect layout regions
+            ReadingOrderStage(),          # Stage 3: Order regions logically
+            TableHandlingStage(),         # Stage 4: Normalize table regions
+            OCRExtractionStage(),         # Stage 5: OCR on the preprocessed image
+            DocumentClassificationStage(),# Stage 6: Classify the document type
+            DocumentAnalysisStage(),      # Stage 7: Reconstruct / normalize text
+            StructuredExtractionStage(),  # Stage 8: Extract structured fields
+            GroundingStage(),             # Stage 9: Validate extracted values
+            BusinessNormalizationStage(), # Stage 10: Normalize field values
+            PersistenceStage(),           # Stage 11: Save extracted fields to DB
         ]
         logger.info(
             "[Pipeline] Orchestrator initialized with %d stages: %s",
@@ -53,7 +75,7 @@ class PipelineOrchestrator:
             "document_id": str(document_id),
             "minio_path": minio_path
         }
-        results = {}
+        results: Dict[str, Any] = {}
         
         # Step 2: Loop over all stages
         for index, stage in enumerate(self.stages, 1):
@@ -73,7 +95,8 @@ class PipelineOrchestrator:
                     "success": result.success,
                     "metadata": result.metadata
                 }
-                # Check if stage failed
+                
+                # stop immediately if stage failed
                 if not result.success:
                     logger.error(
                         "[Pipeline] Stage %s FAILED: %s",
